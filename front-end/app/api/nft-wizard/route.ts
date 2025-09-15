@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPEN_AI_API_KEY,
-});
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+}) : null;
 
 interface NFTPlan {
   collectionName?: string;
@@ -12,6 +12,7 @@ interface NFTPlan {
   description?: string;
   royaltiesPct?: number;
   mediaUrl?: string;
+  mediaPrompt?: string;
   airdrop?: {
     recipient: string;
     amount?: number;
@@ -27,7 +28,7 @@ Required information:
 - Collection name (1-32 characters)
 - Symbol (3-12 characters, uppercase letters/numbers)
 - Total supply/Number of NFTs (1-10000)
-- Media URL (valid URL format)
+- Media URL (valid URL format) OR Media Prompt (text description for AI image generation)
 
 Optional information:
 - Description (up to 500 characters)
@@ -63,6 +64,13 @@ export async function POST(request: NextRequest) {
   try {
     const { messages, currentPlan, network } = await request.json();
 
+    if (!openai) {
+      return NextResponse.json(
+        { error: 'OpenAI API key not configured' },
+        { status: 503 }
+      );
+    }
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [
@@ -96,6 +104,10 @@ export async function POST(request: NextRequest) {
               mediaUrl: {
                 type: 'string',
                 description: 'Media or IPFS URL for the collection',
+              },
+              mediaPrompt: {
+                type: 'string',
+                description: 'Text prompt for AI image generation if mediaUrl is not provided',
               },
               description: {
                 type: 'string',
@@ -226,7 +238,7 @@ function validateNFTPlan(plan: any): NFTPlan {
     validated.needsInfo.push('totalSupply');
   }
 
-  // Validate media URL (required)
+  // Validate media URL or media prompt (at least one required)
   if (plan.mediaUrl) {
     try {
       new URL(plan.mediaUrl);
@@ -234,6 +246,8 @@ function validateNFTPlan(plan: any): NFTPlan {
     } catch {
       validated.needsInfo.push('mediaUrl');
     }
+  } else if (plan.mediaPrompt && plan.mediaPrompt.trim().length > 0) {
+    validated.mediaPrompt = plan.mediaPrompt.trim();
   } else {
     validated.needsInfo.push('mediaUrl');
   }

@@ -1,6 +1,5 @@
 import { StellarWalletsKit } from '@creit.tech/stellar-wallets-kit';
-
-const RPC_URL = process.env.NEXT_PUBLIC_SOROBAN_RPC_URL!;
+import { StellarNetwork } from '../app/providers/NetworkProvider';
 
 export interface ContractCallParams {
   contractId: string;
@@ -8,6 +7,10 @@ export interface ContractCallParams {
   args: any[];
   walletKit: StellarWalletsKit;
   userAddress: string;
+  network: StellarNetwork;
+  rpcUrl: string;
+  networkPassphrase: string;
+  getExplorerUrl: (type: 'tx' | 'contract', id: string) => string;
 }
 
 export interface TransactionResult {
@@ -21,7 +24,11 @@ export async function invokeWithFreighter({
   method,
   args,
   walletKit,
-  userAddress
+  userAddress,
+  network,
+  rpcUrl,
+  networkPassphrase,
+  getExplorerUrl
 }: ContractCallParams): Promise<TransactionResult> {
   try {
     // Dynamic imports to avoid SSR issues
@@ -32,7 +39,7 @@ export async function invokeWithFreighter({
       Contract
     } = await import('@stellar/stellar-sdk');
     
-    const rpcServer = new SorobanRpc.Server(RPC_URL);
+    const rpcServer = new SorobanRpc.Server(rpcUrl);
     
     // Create contract instance
     const contract = new Contract(contractId);
@@ -46,7 +53,7 @@ export async function invokeWithFreighter({
     // Build transaction
     const txBuilder = new TransactionBuilder(account, {
       fee: '100000', // Base fee
-      networkPassphrase: Networks.TESTNET,
+      networkPassphrase,
     });
     
     txBuilder.addOperation(operation);
@@ -70,11 +77,11 @@ export async function invokeWithFreighter({
     
     // Sign with Freighter
     const { signedTxXdr } = await walletKit.signTransaction(assembledTx.toXDR(), {
-      networkPassphrase: Networks.TESTNET,
+      networkPassphrase,
     });
     
     // Parse signed transaction
-    const signedTx = TransactionBuilder.fromXDR(signedTxXdr, Networks.TESTNET);
+    const signedTx = TransactionBuilder.fromXDR(signedTxXdr, networkPassphrase);
     
     // Submit transaction
     const result = await rpcServer.sendTransaction(signedTx);
@@ -94,7 +101,7 @@ export async function invokeWithFreighter({
       if (status.status === 'SUCCESS') {
         return {
           txHash: hash,
-          explorerUrl: `https://stellar.expert/explorer/testnet/tx/${hash}`,
+          explorerUrl: getExplorerUrl('tx', hash),
           result: status.returnValue
         };
       } else if (status.status === 'FAILED') {
@@ -109,7 +116,7 @@ export async function invokeWithFreighter({
     // If we reach here, transaction is still pending
     return {
       txHash: hash,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${hash}`
+      explorerUrl: getExplorerUrl('tx', hash)
     };
     
   } catch (error) {

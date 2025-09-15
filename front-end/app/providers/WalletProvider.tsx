@@ -7,12 +7,14 @@ import {
   FreighterModule,
   FREIGHTER_ID
 } from '@creit.tech/stellar-wallets-kit';
+import { useNetwork } from './NetworkProvider';
 
 interface WalletContextType {
   publicKey: string | null;
   connect: () => Promise<void>;
   disconnect: () => void;
   isConnected: boolean;
+  signTransaction: (xdr: string, options?: any) => Promise<string>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -24,10 +26,14 @@ interface WalletProviderProps {
 export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [kit, setKit] = useState<StellarWalletsKit | null>(null);
+  const { network } = useNetwork();
 
+  // Reinitialize wallet kit when network changes
   useEffect(() => {
+    const walletNetwork = network === 'MAINNET' ? WalletNetwork.PUBLIC : WalletNetwork.TESTNET;
+    
     const walletKit = new StellarWalletsKit({
-      network: WalletNetwork.TESTNET,
+      network: walletNetwork,
       selectedWalletId: FREIGHTER_ID,
       modules: [new FreighterModule()],
     });
@@ -39,7 +45,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     if (storedPublicKey) {
       setPublicKey(storedPublicKey);
     }
-  }, []);
+  }, [network]);
 
   const connect = async (): Promise<void> => {
     if (!kit) return;
@@ -67,6 +73,20 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     localStorage.removeItem('stellar_wallet_public_key');
   };
 
+  const signTransaction = async (xdr: string, options?: any): Promise<string> => {
+    if (!kit || !publicKey) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      const { signedTxXdr } = await kit.signTransaction(xdr, options);
+      return signedTxXdr;
+    } catch (error) {
+      console.error('Failed to sign transaction:', error);
+      throw error;
+    }
+  };
+
   const isConnected = publicKey !== null;
 
   const contextValue: WalletContextType = {
@@ -74,6 +94,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     connect,
     disconnect,
     isConnected,
+    signTransaction,
   };
 
   return (

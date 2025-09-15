@@ -1,25 +1,23 @@
 'use client';
 
-import { useState, useContext } from 'react';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowDown, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowDown, ExternalLink, AlertCircle } from 'lucide-react';
 import { swapTokens, buildSwapPlan, SwapPlan } from '@/lib/soroswap';
 import { TransactionResult } from '@/lib/soroban';
-import { StellarWalletsKit, WalletNetwork } from '@creit.tech/stellar-wallets-kit';
+import { useWallet } from '../providers/WalletProvider';
+import TopNav from '@/components/TopNav';
 
 const TOKEN_A_ID = process.env.NEXT_PUBLIC_TOKEN_A_ID!;
 const TOKEN_B_ID = process.env.NEXT_PUBLIC_TOKEN_B_ID!;
 
 export default function SwapPage() {
-  const [walletKit, setWalletKit] = useState<StellarWalletsKit | null>(null);
-  const [publicKey, setPublicKey] = useState<string>('');
-  const [isConnected, setIsConnected] = useState(false);
+  const { publicKey, signTransaction, isConnected } = useWallet();
 
   // Form state
   const [tokenInId, setTokenInId] = useState(TOKEN_A_ID);
@@ -33,33 +31,6 @@ export default function SwapPage() {
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const connectWallet = async () => {
-    try {
-      const kit = new StellarWalletsKit({
-        network: WalletNetwork.TESTNET,
-        selectedWalletId: 'freighter',
-        modules: []
-      });
-
-      await kit.openModal({
-        onWalletSelected: async (option) => {
-          try {
-            kit.setWallet(option.id);
-            const { address } = await kit.getAddress();
-            
-            setWalletKit(kit);
-            setPublicKey(address);
-            setIsConnected(true);
-            setError(null);
-          } catch (error) {
-            setError(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
-        }
-      });
-    } catch (error) {
-      setError(`Failed to initialize wallet: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
 
   const buildPlan = () => {
     if (!amount || !amountOutMin) {
@@ -80,7 +51,7 @@ export default function SwapPage() {
   };
 
   const executeSwap = async () => {
-    if (!walletKit || !publicKey || !plan) {
+    if (!publicKey || !plan) {
       setError('Wallet not connected or plan not built');
       return;
     }
@@ -94,7 +65,7 @@ export default function SwapPage() {
         tokenOutId,
         amountIn: amount,
         amountOutMin,
-        walletKit,
+        signTransaction,
         userAddress: publicKey
       });
 
@@ -116,37 +87,19 @@ export default function SwapPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 max-w-2xl">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Token Swap</h1>
-          <p className="text-muted-foreground">
-            Swap tokens using Soroswap on Stellar Testnet
-          </p>
-        </div>
+    <div className="min-h-screen bg-bg-light dark:bg-bg-dark">
+      <TopNav />
+      <div className="pt-28">
+        <div className="max-w-xl mx-auto p-6 space-y-4">
+          <div>
+            <h1 className="text-3xl font-bold">Token Swap</h1>
+            <p className="text-muted-foreground">
+              Swap tokens using Soroswap on Stellar Testnet
+            </p>
+          </div>
 
-        {/* Wallet Connection */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Wallet Connection</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isConnected ? (
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <span>Connected: {publicKey.substring(0, 8)}...{publicKey.slice(-8)}</span>
-                <Badge className="bg-green-100 text-green-700">Testnet</Badge>
-              </div>
-            ) : (
-              <Button onClick={connectWallet} className="w-full">
-                Connect Freighter Wallet
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Swap Form */}
-        <Card>
+          {/* Swap Form */}
+          <Card>
           <CardHeader>
             <CardTitle>Swap Configuration</CardTitle>
           </CardHeader>
@@ -287,7 +240,8 @@ export default function SwapPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

@@ -25,9 +25,9 @@ const TopNav: React.FC = () => {
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/nfts', label: 'NFTs' },
     { href: '/defi', label: 'DeFi' },
-    { href: '/swap', label: 'Swap' },
-    { href: '/lend', label: 'Lend' },
-    { href: '/dev/sdk-check', label: 'SDK Test' },
+    // { href: '/swap', label: 'Swap' },
+    // { href: '/lend', label: 'Lend' },
+    // { href: '/dev/sdk-check', label: 'SDK Test' },
     { href: '/about', label: 'About' },
   ];
 

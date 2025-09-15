@@ -20,6 +20,12 @@ interface NFTPlan {
   network: 'TESTNET' | 'MAINNET';
   isComplete: boolean;
   needsInfo: string[];
+  // Confirmation tracking
+  pendingConfirmation?: {
+    field: 'collectionName' | 'symbol' | 'totalSupply' | 'mediaUrl' | 'mediaPrompt' | 'description' | 'royaltiesPct' | 'airdrop';
+    value: any;
+    question: string;
+  };
 }
 
 interface WizardResponse {
@@ -30,7 +36,17 @@ interface WizardResponse {
 
 const SYSTEM_PROMPT = `You are the Stellar NFT Wizard, a friendly AI assistant that helps users create NFT collections on the Stellar blockchain.
 
-Your job is to gather information through natural conversation and validate inputs. Always be conversational and friendly, using wizard-themed language.
+CRITICAL CONVERSATION RULES:
+1. NEVER automatically assign user input to fields without explicit confirmation
+2. When users greet you (hi, hello, gm, etc.) or ask questions, respond conversationally
+3. Validate ALL inputs before accepting them - reject vague, generic, or invalid inputs politely
+4. Always CONFIRM each field explicitly with the user before adding it to the plan
+5. Use clear, scannable Markdown formatting with emojis and bullet points
+
+CONFIRMATION FLOW EXAMPLE:
+User: "Cyber Wizards"
+You: "🧙‍♂️ Great choice! You'd like your collection to be called **'Cyber Wizards'**, correct? (yes/no)"
+User: "yes" → THEN set collectionName in plan
 
 Required information:
 - Collection name (1-32 characters)
@@ -145,7 +161,7 @@ async function callOpenAIWithRetry(messages: any[], network: string, retries = 3
         ],
         tool_choice: 'auto',
         temperature: 0.7,
-        timeout: 10000, // 10 second timeout
+        // timeout: 10000, // 10 second timeout - removed as not supported in this API version
       });
 
       return completion;
@@ -386,12 +402,55 @@ function isValidCollectionName(name: string): boolean {
   if (!name || name.length < 3 || name.length > 40) return false;
   if (isGreeting(name)) return false;
   
-  // Check if it's too generic
-  const generic = ['test', 'nft', 'collection', 'token', 'coin', 'crypto'];
-  const lowerName = name.toLowerCase();
+  // Check if it's too generic or vague
+  const generic = ['test', 'nft', 'collection', 'token', 'coin', 'crypto', 'ok', 'sure', 'yes', 'no', 'maybe', 'something', 'anything', 'whatever'];
+  const lowerName = name.toLowerCase().trim();
   if (generic.includes(lowerName)) return false;
   
+  // Must contain at least one letter
+  if (!/[a-zA-Z]/.test(name)) return false;
+  
   return true;
+}
+
+function isValidSymbol(symbol: string): boolean {
+  if (!symbol) return false;
+  const symbolRegex = /^[A-Z0-9]{3,12}$/;
+  return symbolRegex.test(symbol.toUpperCase());
+}
+
+function isValidSupply(input: string): number | null {
+  const num = parseInt(input.trim());
+  if (isNaN(num) || num < 1 || num > 10000) return null;
+  return num;
+}
+
+function isValidMediaUrl(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    return ['http:', 'https:', 'ipfs:'].includes(urlObj.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function isValidMediaPrompt(prompt: string): boolean {
+  if (!prompt || prompt.length < 10) return false;
+  if (isGreeting(prompt)) return false;
+  
+  const generic = ['test', 'image', 'picture', 'something', 'anything', 'whatever', 'art', 'drawing'];
+  const lowerPrompt = prompt.toLowerCase().trim();
+  if (generic.includes(lowerPrompt)) return false;
+  
+  return true;
+}
+
+function isConfirmation(message: string): boolean {
+  const confirmations = ['yes', 'y', 'yeah', 'yep', 'correct', 'right', 'that\'s right', 'exactly', 'perfect', 'ok', 'okay', 'confirm', 'confirmed'];
+  const rejections = ['no', 'n', 'nope', 'incorrect', 'wrong', 'not right', 'cancel'];
+  const lowerMessage = message.toLowerCase().trim();
+  
+  return confirmations.includes(lowerMessage) || rejections.includes(lowerMessage);
 }
 
 function preprocessImagePrompt(prompt: string): string {
@@ -429,102 +488,182 @@ function isValidImagePrompt(prompt: string): boolean {
 }
 
 function handleFallbackFlow(messages: any[], currentPlan: any, network: string) {
-  const fallbackPlan = { ...currentPlan } || {
+  const fallbackPlan = currentPlan ? { ...currentPlan } : {
     network: network || 'TESTNET',
     isComplete: false,
     needsInfo: ['collectionName', 'symbol', 'totalSupply', 'mediaUrl'],
   };
 
   const lastMessage = messages[messages.length - 1]?.content?.trim() || '';
-  const lowerMessage = lastMessage.toLowerCase();
 
-  // Handle greetings separately
-  if (isGreeting(lastMessage) && !fallbackPlan.collectionName) {
+  // Handle greetings
+  if (isGreeting(lastMessage) && !fallbackPlan.collectionName && !fallbackPlan.pendingConfirmation) {
     return NextResponse.json({
       type: 'followup',
-      message: "🧙‍♂️ Greetings, fellow creator! I'm the Stellar NFT Wizard, and I'm here to help you bring your digital collection to life on the Stellar blockchain.\n\n✨ I'll guide you through creating your NFT collection step by step. Let's start with the basics:\n\n**What would you like to name your NFT collection?**\n\n(Choose something descriptive and unique - this will be the main name people see!)",
+      message: "🧙‍♂️ **Welcome, fellow creator!**\n\nI'm the Stellar NFT Wizard, here to help you bring your digital collection to life on the Stellar blockchain.\n\n✨ **What I can help you with:**\n- Create NFT collections with custom names and symbols\n- Generate stunning AI artwork for your NFTs\n- Set up royalties and airdrops\n- Deploy everything to Stellar's network\n\n💬 **Would you like to start by naming your NFT collection, or do you have a question first?**\n\nFeel free to ask questions or jump right in!",
       plan: fallbackPlan,
     });
   }
 
-  // Only process collection name if it's valid and we don't have one yet
-  if (!fallbackPlan.collectionName && lastMessage && messages.length > 1) {
-    if (isValidCollectionName(lastMessage)) {
-      fallbackPlan.collectionName = lastMessage;
-      fallbackPlan.needsInfo = (fallbackPlan.needsInfo || []).filter(f => f !== 'collectionName');
-    } else if (!isGreeting(lastMessage)) {
-      // Invalid name but not a greeting - ask for clarification
+  // Handle pending confirmations
+  if (fallbackPlan.pendingConfirmation) {
+    const isPositive = ['yes', 'y', 'yeah', 'yep', 'correct', 'right', 'that\'s right', 'exactly', 'perfect', 'ok', 'okay', 'confirm', 'confirmed'].includes(lastMessage.toLowerCase().trim());
+    const isNegative = ['no', 'n', 'nope', 'incorrect', 'wrong', 'not right', 'cancel'].includes(lastMessage.toLowerCase().trim());
+    
+    if (isPositive) {
+      // Confirm the field
+      const field = fallbackPlan.pendingConfirmation.field;
+      const value = fallbackPlan.pendingConfirmation.value;
+      
+      fallbackPlan[field] = value;
+      fallbackPlan.needsInfo = (fallbackPlan.needsInfo || []).filter((f: string) => f !== field && f !== 'symbol'); // Remove both field and symbol since symbol relates to collectionName
+      delete fallbackPlan.pendingConfirmation;
+      
+      // Move to next field
+      return getNextStepMessage(fallbackPlan);
+    } else if (isNegative) {
+      delete fallbackPlan.pendingConfirmation;
+      return getNextStepMessage(fallbackPlan, "No problem! Let's try again.");
+    } else {
+      // Not a clear yes/no, re-ask for confirmation
       return NextResponse.json({
         type: 'followup',
-        message: `Hmm, "${lastMessage}" seems a bit short or generic for an NFT collection name. \n\n🎨 Let's choose something more descriptive and unique! What's your collection really about? \n\nFor example: "Mystic Dragons", "Pixel Pandas", "Cosmic Crystals", etc.`,
+        message: `${fallbackPlan.pendingConfirmation.question}\n\n💬 **Please answer yes or no.**`,
         plan: fallbackPlan,
       });
     }
   }
 
-  if (!fallbackPlan.symbol && fallbackPlan.collectionName && lastMessage) {
-    // Look for symbol-like patterns (3-12 uppercase chars/numbers)
-    const symbolMatch = lastMessage.match(/\b[A-Z0-9]{3,12}\b/);
-    if (symbolMatch) {
-      fallbackPlan.symbol = symbolMatch[0];
-      fallbackPlan.needsInfo = (fallbackPlan.needsInfo || []).filter(f => f !== 'symbol');
-    } else if (lastMessage.length >= 3 && lastMessage.length <= 12) {
-      fallbackPlan.symbol = lastMessage.toUpperCase();
-      fallbackPlan.needsInfo = (fallbackPlan.needsInfo || []).filter(f => f !== 'symbol');
-    }
-  }
-
-  if (!fallbackPlan.totalSupply && fallbackPlan.symbol && lastMessage) {
-    // Look for numbers
-    const numberMatch = lastMessage.match(/\b(\d+)\b/);
-    if (numberMatch) {
-      const num = parseInt(numberMatch[1]);
-      if (num >= 1 && num <= 10000) {
-        fallbackPlan.totalSupply = num;
-        fallbackPlan.needsInfo = (fallbackPlan.needsInfo || []).filter(f => f !== 'totalSupply');
-      }
-    }
-  }
-
-  if (!fallbackPlan.mediaUrl && !fallbackPlan.mediaPrompt && fallbackPlan.totalSupply && lastMessage) {
-    // Check if it's a URL or a description
-    if (lastMessage.startsWith('http') || lastMessage.startsWith('ipfs://')) {
-      fallbackPlan.mediaUrl = lastMessage;
-      fallbackPlan.needsInfo = (fallbackPlan.needsInfo || []).filter(f => f !== 'mediaUrl');
-    } else if (lastMessage.length > 10) {
-      fallbackPlan.mediaPrompt = lastMessage;
-      fallbackPlan.needsInfo = (fallbackPlan.needsInfo || []).filter(f => f !== 'mediaUrl');
-    }
-  }
-
-  // Update needsInfo based on what we have
-  const missing = [];
-  if (!fallbackPlan.collectionName) missing.push('collectionName');
-  if (!fallbackPlan.symbol) missing.push('symbol');
-  if (!fallbackPlan.totalSupply) missing.push('totalSupply');
-  if (!fallbackPlan.mediaUrl && !fallbackPlan.mediaPrompt) missing.push('mediaUrl');
-  
-  fallbackPlan.needsInfo = missing;
-  fallbackPlan.isComplete = missing.length === 0;
-
-  // Determine next question
-  let nextQuestion = "🧙‍♂️ Let's create your NFT collection! I'll guide you through each step.";
+  // Process new input based on what we're currently collecting
   if (!fallbackPlan.collectionName) {
-    nextQuestion = "✨ What would you like to name your NFT collection?";
+    if (isValidCollectionName(lastMessage)) {
+      // Propose collection name for confirmation
+      fallbackPlan.pendingConfirmation = {
+        field: 'collectionName',
+        value: lastMessage,
+        question: `🧙‍♂️ Great choice! You'd like your collection to be called **"${lastMessage}"**, correct?`
+      };
+      
+      return NextResponse.json({
+        type: 'followup',
+        message: `✨ You've chosen the name **"${lastMessage}"** for your collection.\n\n✅ **Is this correct?**\n(Reply with **yes** or **no**)`,
+        plan: fallbackPlan,
+      });
+    } else if (!isGreeting(lastMessage) && lastMessage.length > 0) {
+      return NextResponse.json({
+        type: 'followup',
+        message: `⚠️ **"${lastMessage}"** is too short, generic, or unclear for an NFT collection name.\n\nPlease choose a descriptive collection name (between **3 and 40 characters**).\n\n🎨 **Examples:**\n- **Mystic Dragons**\n- **Pixel Pandas** \n- **Cosmic Crystals**\n- **Digital Art Warriors**`,
+        plan: fallbackPlan,
+      });
+    }
   } else if (!fallbackPlan.symbol) {
-    nextQuestion = `🔤 Great! Now I need a symbol for "${fallbackPlan.collectionName}". Please enter 3-12 characters (letters/numbers, uppercase):`;
+    const upperMessage = lastMessage.toUpperCase();
+    if (isValidSymbol(upperMessage)) {
+      fallbackPlan.pendingConfirmation = {
+        field: 'symbol',
+        value: upperMessage,
+        question: `🔤 Perfect! You want the symbol to be **"${upperMessage}"**, correct?`
+      };
+      
+      return NextResponse.json({
+        type: 'followup',
+        message: `🔤 You've chosen **"${upperMessage}"** as your collection symbol.\n\n✅ **Is this correct?**\n(Reply with **yes** or **no**)`,
+        plan: fallbackPlan,
+      });
+    } else {
+      return NextResponse.json({
+        type: 'followup',
+        message: `⚠️ **"${lastMessage}"** is not a valid symbol.\n\n🔤 Please enter **3-12 characters** using only uppercase letters and numbers.\n\n**Examples:**\n- **CYBER**\n- **DRAG123**\n- **PIXELS**\n- **ART2024**`,
+        plan: fallbackPlan,
+      });
+    }
   } else if (!fallbackPlan.totalSupply) {
-    nextQuestion = `🔢 Perfect! How many "${fallbackPlan.symbol}" NFTs should be minted? (Enter a number between 1-10,000):`;
+    const supply = isValidSupply(lastMessage);
+    if (supply) {
+      fallbackPlan.pendingConfirmation = {
+        field: 'totalSupply',
+        value: supply,
+        question: `🔢 Got it! You want to mint **${supply} NFTs**, correct?`
+      };
+      
+      return NextResponse.json({
+        type: 'followup',
+        message: `🔢 You want to mint **${supply} NFTs** for your collection.\n\n✅ **Is this correct?**\n(Reply with **yes** or **no**)`,
+        plan: fallbackPlan,
+      });
+    } else {
+      return NextResponse.json({
+        type: 'followup',
+        message: `⚠️ **"${lastMessage}"** is not a valid number.\n\n🔢 Please enter a number between **1 and 10,000**.\n\n**Examples:**\n- **100**\n- **1000**\n- **5000**`,
+        plan: fallbackPlan,
+      });
+    }
   } else if (!fallbackPlan.mediaUrl && !fallbackPlan.mediaPrompt) {
-    nextQuestion = `🎨 Almost done! For the NFT image, you can either:\n• Provide an image URL/IPFS link\n• Describe the image you'd like me to generate`;
+    if (isValidMediaUrl(lastMessage)) {
+      fallbackPlan.pendingConfirmation = {
+        field: 'mediaUrl',
+        value: lastMessage,
+        question: `🖼️ Great! You want to use this image URL: **${lastMessage}**, correct?`
+      };
+      
+      return NextResponse.json({
+        type: 'followup',
+        message: `🖼️ You want to use this image URL for your collection:\n\n**${lastMessage}**\n\n✅ **Is this correct?**\n(Reply with **yes** or **no**)`,
+        plan: fallbackPlan,
+      });
+    } else if (isValidMediaPrompt(lastMessage)) {
+      fallbackPlan.pendingConfirmation = {
+        field: 'mediaPrompt',
+        value: lastMessage,
+        question: `🎨 Perfect! You want me to generate an image with this description: **"${lastMessage}"**, correct?`
+      };
+      
+      return NextResponse.json({
+        type: 'followup',
+        message: `🎨 You want me to generate an image with this description:\n\n**"${lastMessage}"**\n\n✅ **Is this correct?**\n(Reply with **yes** or **no**)`,
+        plan: fallbackPlan,
+      });
+    } else {
+      return NextResponse.json({
+        type: 'followup',
+        message: `⚠️ That doesn't look like a valid URL or image description.\n\n🎨 **For the NFT image, you can either:**\n\n1. **Provide a URL:**\n   - **https://example.com/image.png**\n   - **ipfs://...**\n\n2. **Describe the image:**\n   - **A majestic dragon with golden scales flying over mountains**\n   - **Pixel art robot in a futuristic city**\n\n**Please try again with one of these options.**`,
+        plan: fallbackPlan,
+      });
+    }
+  }
+
+  // If we get here, guide them to the next step
+  return getNextStepMessage(fallbackPlan);
+}
+
+function getNextStepMessage(plan: any, prefix = "") {
+  const missing = [];
+  if (!plan.collectionName) missing.push('collectionName');
+  if (!plan.symbol) missing.push('symbol');
+  if (!plan.totalSupply) missing.push('totalSupply');
+  if (!plan.mediaUrl && !plan.mediaPrompt) missing.push('mediaUrl');
+  
+  plan.needsInfo = missing;
+  plan.isComplete = missing.length === 0;
+
+  let message = prefix ? `${prefix}\n\n` : "";
+
+  if (!plan.collectionName) {
+    message += "✨ **What would you like to name your NFT collection?**\n\nChoose something descriptive and unique!";
+  } else if (!plan.symbol) {
+    message += `🔤 **Now I need a symbol for "${plan.collectionName}"**\n\nPlease enter **3-12 characters** (letters/numbers, uppercase).`;
+  } else if (!plan.totalSupply) {
+    message += `🔢 **How many NFTs should be minted for ${plan.collectionName}?**\n\nEnter a number between **1 and 10,000**.`;
+  } else if (!plan.mediaUrl && !plan.mediaPrompt) {
+    message += `🎨 **Almost done! For the NFT image, you can either:**\n\n1. **Provide an image URL/IPFS link**\n2. **Describe the image you'd like me to generate**`;
   } else {
-    nextQuestion = `✅ Perfect! I have everything needed:\n• Collection: ${fallbackPlan.collectionName}\n• Symbol: ${fallbackPlan.symbol}\n• Supply: ${fallbackPlan.totalSupply} NFTs\n• Media: ${fallbackPlan.mediaUrl ? 'URL provided' : 'AI generation planned'}`;
+    message += `✅ **Perfect! I have everything needed:**\n\n- **Collection:** ${plan.collectionName}\n- **Symbol:** ${plan.symbol}\n- **Supply:** ${plan.totalSupply} NFTs\n- **Media:** ${plan.mediaUrl ? 'URL provided' : 'AI generation planned'}`;
   }
 
   return NextResponse.json({
-    type: fallbackPlan.isComplete ? 'plan' : 'followup',
-    message: nextQuestion,
-    plan: validateNFTPlan(fallbackPlan),
+    type: plan.isComplete ? 'plan' : 'followup',
+    message,
+    plan: validateNFTPlan(plan),
   });
 }
 
@@ -534,6 +673,11 @@ function validateNFTPlan(plan: any): NFTPlan {
     isComplete: false,
     needsInfo: [],
   };
+  
+  // Preserve pending confirmation
+  if (plan.pendingConfirmation) {
+    validated.pendingConfirmation = plan.pendingConfirmation;
+  }
 
   // Validate collection name
   if (plan.collectionName) {

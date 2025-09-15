@@ -43,6 +43,12 @@ interface NFTPlan {
   network: 'TESTNET' | 'MAINNET';
   isComplete: boolean;
   needsInfo: string[];
+  // Confirmation tracking
+  pendingConfirmation?: {
+    field: 'collectionName' | 'symbol' | 'totalSupply' | 'mediaUrl' | 'mediaPrompt' | 'description' | 'royaltiesPct' | 'airdrop';
+    value: any;
+    question: string;
+  };
 }
 
 interface Message {
@@ -74,7 +80,7 @@ const NFTCreator: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "🧙‍♂️ Greetings, fellow creator! I'm the Stellar NFT Wizard, and I'm here to help you bring your digital collection to life on the Stellar blockchain.\\n\\n✨ I'll guide you through each step of creating your NFT collection - from choosing a name to generating artwork and deploying to the network.\\n\\n**Ready to begin? What would you like to name your NFT collection?**\\n\\n(Choose something descriptive and unique - this will be the main name people see!)",
+      content: "🧙‍♂️ **Welcome, fellow creator!**\\n\\nI'm the Stellar NFT Wizard, here to help you bring your digital collection to life on the Stellar blockchain.\\n\\n✨ **What I can help you with:**\\n- Create NFT collections with custom names and symbols\\n- Generate stunning AI artwork for your NFTs\\n- Set up royalties and airdrops\\n- Deploy everything to Stellar's network\\n\\n💬 **Would you like to start by naming your NFT collection, or do you have a question first?**\\n\\nFeel free to ask questions or jump right in!",
       timestamp: new Date()
     }
   ]);
@@ -99,24 +105,10 @@ const NFTCreator: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Removed auto-nudge system - let users respond naturally
   useEffect(() => {
-    // Schedule nudge only when appropriate
-    const field = collectState.awaitingField;
-    if (
-      currentPhase === FlowPhase.COLLECTING &&
-      !collectState.inFlight &&
-      !isLoading &&
-      lastMessageRole === 'assistant' &&
-      field &&
-      collectState.missing.length > 0
-    ) {
-      scheduleNudge(field);
-    } else {
-      clearNudgeTimeout();
-    }
-
     return () => clearNudgeTimeout();
-  }, [currentPhase, collectState.inFlight, isLoading, lastMessageRole, collectState.awaitingField, messages.length]);
+  }, []);
 
   useEffect(() => {
     // Initialize image prompt from plan when entering image generation
@@ -149,9 +141,9 @@ const NFTCreator: React.FC = () => {
     return missing;
   };
 
-  const getAwaitingField = (missing: string[]): string | undefined => {
+  const getAwaitingField = (missing: string[]): "collectionName" | "totalSupply" | "mediaUrlOrPrompt" | "royaltiesPct" | "airdrop" | "network" | undefined => {
     if (missing.includes('collectionName')) return 'collectionName';
-    if (missing.includes('symbol')) return 'symbol';
+    if (missing.includes('symbol')) return 'collectionName'; // Map symbol to collectionName for simplicity
     if (missing.includes('totalSupply')) return 'totalSupply';
     if (missing.includes('mediaUrlOrPrompt')) return 'mediaUrlOrPrompt';
     return undefined;
@@ -159,67 +151,9 @@ const NFTCreator: React.FC = () => {
 
   // Remove old startInactivityTimeout function - replaced by scheduleNudge
 
-  const sendFollowupFromAI = async (field: string) => {
-    if (collectState.inFlight) return;
-    
-    try {
-      setCollectState(prev => ({ ...prev, inFlight: true }));
-      
-      const response = await fetch('/api/ai/nft-wizard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: messages.map(m => ({ role: m.role, content: m.content })),
-          currentPlan: nftPlan,
-          network,
-          conversationId,
-          requestType: 'nudge',
-          awaitingField: field
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.type === 'followup' && data.message) {
-          const nudgeMessage: Message = {
-            role: 'assistant',
-            content: data.message,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, nudgeMessage]);
-          setLastMessageRole('assistant');
-        }
-      }
-    } catch (error) {
-      console.error('Error sending nudge:', error);
-    } finally {
-      setCollectState(prev => ({ ...prev, inFlight: false }));
-    }
-  };
+  // Removed automatic follow-up system
 
-  const scheduleNudge = (field: string) => {
-    clearNudgeTimeout();
-    
-    nudgeRef.current = setTimeout(() => {
-      if (
-        currentPhase === FlowPhase.COLLECTING &&
-        !collectState.inFlight &&
-        lastMessageRole === 'assistant' &&
-        (collectState.nudgeCountForField[field] ?? 0) < 1 &&
-        collectState.lastNudgeKey !== field
-      ) {
-        sendFollowupFromAI(field);
-        setCollectState(prev => ({
-          ...prev,
-          nudgeCountForField: {
-            ...prev.nudgeCountForField,
-            [field]: (prev.nudgeCountForField[field] ?? 0) + 1
-          },
-          lastNudgeKey: field
-        }));
-      }
-    }, 3000);
-  };
+  // Removed nudge scheduling system
 
   const sendMessage = async () => {
     if (!currentMessage.trim() || collectState.inFlight || isLoading) return;
@@ -296,7 +230,7 @@ const NFTCreator: React.FC = () => {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: 'I encountered a technical hiccup. Could you please try sending your message again?',
+        content: '⚠️ **I encountered a technical hiccup.**\\n\\nCould you please try sending your message again?',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -319,7 +253,7 @@ const NFTCreator: React.FC = () => {
     setCurrentPhase(FlowPhase.COLLECTING);
     const modifyMessage: Message = {
       role: 'assistant',
-      content: "What would you like to change about your NFT collection plan? I can help you modify any aspect of it.",
+      content: "🔧 **What would you like to change about your NFT collection plan?**\\n\\nI can help you modify any aspect of it.",
       timestamp: new Date()
     };
     setMessages(prev => [...prev, modifyMessage]);
@@ -451,7 +385,7 @@ const NFTCreator: React.FC = () => {
 
       const errorMessage: Message = {
         role: 'assistant',
-        content: `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again or modify your plan.`,
+        content: `⚠️ **Transaction failed:**\\n${error instanceof Error ? error.message : 'Unknown error'}\\n\\nPlease try again or modify your plan.`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -465,7 +399,7 @@ const NFTCreator: React.FC = () => {
     if (!prompt || prompt.trim().length < 5) {
       const errorMessage: Message = {
         role: 'assistant',
-        content: "Please provide a more detailed description for your NFT image. I need at least 5 characters to create something amazing! 🎨",
+        content: "⚠️ **Please provide a more detailed description for your NFT image.**\\n\\nI need at least **5 characters** to create something amazing! 🎨",
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -498,7 +432,7 @@ const NFTCreator: React.FC = () => {
       console.error('Image generation failed:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: `I had trouble generating that image: ${error instanceof Error ? error.message : 'Unknown error'}\n\n🎨 Try being more specific about what you want to see! For example: "a majestic dragon with golden scales" or "a cute robot in a futuristic city".`,
+        content: `⚠️ **I had trouble generating that image:**\\n${error instanceof Error ? error.message : 'Unknown error'}\\n\\n🎨 **Try being more specific about what you want to see!**\\n\\n**Examples:**\\n- **A majestic dragon with golden scales**\\n- **A cute robot in a futuristic city**`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -528,7 +462,7 @@ const NFTCreator: React.FC = () => {
     // Add a helpful message
     const refineMessage: Message = {
       role: 'assistant',
-      content: "✨ Let's refine your image! Edit the prompt below to describe exactly what you want to see, then generate a new image.",
+      content: "✨ **Let's refine your image!**\\n\\nEdit the prompt below to describe exactly what you want to see, then generate a new image.",
       timestamp: new Date()
     };
     setMessages(prev => [...prev, refineMessage]);
@@ -539,7 +473,7 @@ const NFTCreator: React.FC = () => {
     setCurrentPhase(FlowPhase.COLLECTING);
     setMessages([{
       role: 'assistant',
-      content: "🧙‍♂️ Ready for another magical NFT creation? Let's bring your next digital collection to life!\\n\\n✨ **What would you like to name your new NFT collection?**\\n\\n(Remember to choose something descriptive and unique!)",
+      content: "🧙‍♂️ **Ready for another magical NFT creation?**\\n\\nLet's bring your next digital collection to life!\\n\\n✨ **What I can help you with:**\\n- Create NFT collections with custom names and symbols\\n- Generate stunning AI artwork for your NFTs\\n- Set up royalties and airdrops\\n- Deploy everything to Stellar's network\\n\\n💬 **Would you like to start by naming your NFT collection, or do you have a question first?**\\n\\nFeel free to ask questions or jump right in!",
       timestamp: new Date()
     }]);
     setNftPlan({
@@ -684,7 +618,13 @@ const NFTCreator: React.FC = () => {
                             </span>
                           </div>
                         )}
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <div className="text-sm whitespace-pre-wrap">
+                          {message.content.split('\\n').map((line, i) => (
+                            <div key={i} className={i > 0 ? 'mt-2' : ''}>
+                              {line}
+                            </div>
+                          ))}
+                        </div>
                         <p className="text-xs opacity-60 mt-1">
                           {message.timestamp.toLocaleTimeString()}
                         </p>
@@ -813,7 +753,19 @@ const NFTCreator: React.FC = () => {
                   <p className="font-semibold">{network}</p>
                 </div>
 
-                {nftPlan.needsInfo.length > 0 && (
+                {nftPlan.pendingConfirmation && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Pending Confirmation</label>
+                    <Badge variant="secondary" className="w-full justify-center mt-1">
+                      ⏳ Confirming {nftPlan.pendingConfirmation.field}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      "{nftPlan.pendingConfirmation.value}"
+                    </p>
+                  </div>
+                )}
+
+                {nftPlan.needsInfo.length > 0 && !nftPlan.pendingConfirmation && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Still Needed</label>
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -826,7 +778,7 @@ const NFTCreator: React.FC = () => {
                   </div>
                 )}
 
-                {nftPlan.isComplete && (
+                {nftPlan.isComplete && !nftPlan.pendingConfirmation && (
                   <Badge className="w-full justify-center bg-green-500">
                     <CheckCircle className="w-4 h-4 mr-1" />
                     Plan Complete!

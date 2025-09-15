@@ -12,13 +12,21 @@ import { Loader2, Sparkles, CheckCircle, ExternalLink, Wand2, MessageCircle, Sen
 import NetworkToggle from './ui/NetworkToggle';
 import Image from 'next/image';
 
-enum FlowStep {
-  CONVERSATION = 'conversation',
+enum FlowPhase {
+  COLLECTING = 'collecting',
   IMAGE_GENERATION = 'image-generation',
-  PLAN_READY = 'plan-ready',
-  SIGNING = 'signing',
-  SUCCESS = 'success'
+  CONFIRMING = 'confirming',
+  MINTING = 'minting',
+  DONE = 'done'
 }
+
+type CollectState = {
+  awaitingField?: "collectionName" | "totalSupply" | "mediaUrlOrPrompt" | "royaltiesPct" | "airdrop" | "network";
+  missing: string[];
+  inFlight: boolean;
+  lastNudgeKey?: string;
+  nudgeCountForField: Record<string, number>;
+};
 
 interface NFTPlan {
   collectionName?: string;
@@ -57,18 +65,25 @@ interface NFTCollection {
 const NFTCreator: React.FC = () => {
   const { isConnected, publicKey, signTransaction } = useWallet();
   const { network, getExplorerUrl } = useNetwork();
-  const [currentStep, setCurrentStep] = useState<FlowStep>(FlowStep.CONVERSATION);
+  const [currentPhase, setCurrentPhase] = useState<FlowPhase>(FlowPhase.COLLECTING);
+  const [collectState, setCollectState] = useState<CollectState>({
+    missing: ['collectionName', 'symbol', 'totalSupply', 'mediaUrlOrPrompt'],
+    inFlight: false,
+    nudgeCountForField: {}
+  });
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "🧙‍♂️ Greetings! I'm the Stellar NFT Wizard. I'll help you create your NFT collection step by step. To get started, tell me about the NFT collection you'd like to create!",
+      content: "🧙‍♂️ Greetings, fellow creator! I'm the Stellar NFT Wizard, and I'm here to help you bring your digital collection to life on the Stellar blockchain.\\n\\n✨ I'll guide you through each step of creating your NFT collection - from choosing a name to generating artwork and deploying to the network.\\n\\n**Ready to begin? What would you like to name your NFT collection?**\\n\\n(Choose something descriptive and unique - this will be the main name people see!)",
       timestamp: new Date()
     }
   ]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isMinting, setIsMinting] = useState(false);
-  const [inactivityTimeout, setInactivityTimeout] = useState<NodeJS.Timeout | null>(null);
+  const nudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [conversationId] = useState(`conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [lastMessageRole, setLastMessageRole] = useState<'user' | 'assistant'>('assistant');
   const [nftPlan, setNftPlan] = useState<NFTPlan>({
     network: 'TESTNET',
     isComplete: false,
@@ -85,73 +100,132 @@ const NFTCreator: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    if (currentStep === FlowStep.CONVERSATION && !isLoading) {
-      startInactivityTimeout();
+    // Schedule nudge only when appropriate
+    const field = collectState.awaitingField;
+    if (
+      currentPhase === FlowPhase.COLLECTING &&
+      !collectState.inFlight &&
+      !isLoading &&
+      lastMessageRole === 'assistant' &&
+      field &&
+      collectState.missing.length > 0
+    ) {
+      scheduleNudge(field);
     } else {
-      clearInactivityTimeout();
+      clearNudgeTimeout();
     }
 
-    return () => clearInactivityTimeout();
-  }, [currentStep, isLoading]);
+    return () => clearNudgeTimeout();
+  }, [currentPhase, collectState.inFlight, isLoading, lastMessageRole, collectState.awaitingField, messages.length]);
 
   useEffect(() => {
     // Initialize image prompt from plan when entering image generation
-    if (currentStep === FlowStep.IMAGE_GENERATION && nftPlan.mediaPrompt && !imagePrompt) {
+    if (currentPhase === FlowPhase.IMAGE_GENERATION && nftPlan.mediaPrompt && !imagePrompt) {
       setImagePrompt(nftPlan.mediaPrompt);
       // Auto-generate image if we have a prompt
       generateImage(nftPlan.mediaPrompt);
     }
-  }, [currentStep, nftPlan.mediaPrompt, imagePrompt]);
+  }, [currentPhase, nftPlan.mediaPrompt, imagePrompt]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const clearInactivityTimeout = () => {
-    if (inactivityTimeout) {
-      clearTimeout(inactivityTimeout);
-      setInactivityTimeout(null);
+  const clearNudgeTimeout = () => {
+    if (nudgeRef.current) {
+      clearTimeout(nudgeRef.current);
+      nudgeRef.current = null;
     }
   };
 
-  const startInactivityTimeout = () => {
-    clearInactivityTimeout();
-    const timeout = setTimeout(() => {
-      if (currentStep === FlowStep.CONVERSATION && !isLoading) {
-        const followUpMessage = getFollowUpMessage();
-        if (followUpMessage) {
-          const assistantMessage: Message = {
+  const computeMissing = (plan: NFTPlan): string[] => {
+    const missing: string[] = [];
+    
+    if (!plan.collectionName) missing.push('collectionName');
+    if (!plan.symbol) missing.push('symbol');
+    if (!plan.totalSupply) missing.push('totalSupply');
+    if (!plan.mediaUrl && !plan.mediaPrompt) missing.push('mediaUrlOrPrompt');
+    
+    return missing;
+  };
+
+  const getAwaitingField = (missing: string[]): string | undefined => {
+    if (missing.includes('collectionName')) return 'collectionName';
+    if (missing.includes('symbol')) return 'symbol';
+    if (missing.includes('totalSupply')) return 'totalSupply';
+    if (missing.includes('mediaUrlOrPrompt')) return 'mediaUrlOrPrompt';
+    return undefined;
+  };
+
+  // Remove old startInactivityTimeout function - replaced by scheduleNudge
+
+  const sendFollowupFromAI = async (field: string) => {
+    if (collectState.inFlight) return;
+    
+    try {
+      setCollectState(prev => ({ ...prev, inFlight: true }));
+      
+      const response = await fetch('/api/ai/nft-wizard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messages.map(m => ({ role: m.role, content: m.content })),
+          currentPlan: nftPlan,
+          network,
+          conversationId,
+          requestType: 'nudge',
+          awaitingField: field
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.type === 'followup' && data.message) {
+          const nudgeMessage: Message = {
             role: 'assistant',
-            content: followUpMessage,
+            content: data.message,
             timestamp: new Date()
           };
-          setMessages(prev => [...prev, assistantMessage]);
+          setMessages(prev => [...prev, nudgeMessage]);
+          setLastMessageRole('assistant');
         }
       }
-    }, 3000);
-    setInactivityTimeout(timeout);
+    } catch (error) {
+      console.error('Error sending nudge:', error);
+    } finally {
+      setCollectState(prev => ({ ...prev, inFlight: false }));
+    }
   };
 
-  const getFollowUpMessage = () => {
-    if (nftPlan.needsInfo.includes('collectionName')) {
-      return "What would you like to name your NFT collection?";
-    }
-    if (nftPlan.needsInfo.includes('totalSupply')) {
-      return "How many NFTs should be minted? (1-10,000)";
-    }
-    if (nftPlan.needsInfo.includes('mediaUrl') && !nftPlan.mediaPrompt) {
-      return "Do you have an image prompt or a direct media URL (IPFS) for this collection?";
-    }
-    if (nftPlan.needsInfo.includes('symbol')) {
-      return "What symbol would you like for your collection? (3-12 characters, uppercase)";
-    }
-    return null;
+  const scheduleNudge = (field: string) => {
+    clearNudgeTimeout();
+    
+    nudgeRef.current = setTimeout(() => {
+      if (
+        currentPhase === FlowPhase.COLLECTING &&
+        !collectState.inFlight &&
+        lastMessageRole === 'assistant' &&
+        (collectState.nudgeCountForField[field] ?? 0) < 1 &&
+        collectState.lastNudgeKey !== field
+      ) {
+        sendFollowupFromAI(field);
+        setCollectState(prev => ({
+          ...prev,
+          nudgeCountForField: {
+            ...prev.nudgeCountForField,
+            [field]: (prev.nudgeCountForField[field] ?? 0) + 1
+          },
+          lastNudgeKey: field
+        }));
+      }
+    }, 3000);
   };
 
   const sendMessage = async () => {
-    if (!currentMessage.trim() || isLoading) return;
+    if (!currentMessage.trim() || collectState.inFlight || isLoading) return;
 
-    clearInactivityTimeout();
+    clearNudgeTimeout();
+    setCollectState(prev => ({ ...prev, inFlight: true }));
 
     const userMessage: Message = {
       role: 'user',
@@ -162,9 +236,10 @@ const NFTCreator: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
     setCurrentMessage('');
     setIsLoading(true);
+    setLastMessageRole('user');
 
     try {
-      const response = await fetch('/api/nft-wizard', {
+      const response = await fetch('/api/ai/nft-wizard', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,7 +250,8 @@ const NFTCreator: React.FC = () => {
             content: m.content
           })),
           currentPlan: nftPlan,
-          network
+          network,
+          conversationId
         }),
       });
 
@@ -192,33 +268,43 @@ const NFTCreator: React.FC = () => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      setNftPlan(data.plan);
+      setLastMessageRole('assistant');
+      
+      if (data.plan) {
+        setNftPlan(data.plan);
+        const missing = computeMissing(data.plan);
+        const awaitingField = getAwaitingField(missing);
+        
+        setCollectState(prev => ({
+          ...prev,
+          missing,
+          awaitingField
+        }));
+      }
 
-      // Check if plan is complete and move to next step
-      if (data.plan.isComplete && currentStep === FlowStep.CONVERSATION) {
-        // If no mediaUrl but has mediaPrompt, go to image generation
+      // Handle different response types
+      if (data.type === 'plan' && data.plan?.isComplete) {
+        // Plan is complete, move to next phase
         if (!data.plan.mediaUrl && data.plan.mediaPrompt) {
-          setCurrentStep(FlowStep.IMAGE_GENERATION);
+          setCurrentPhase(FlowPhase.IMAGE_GENERATION);
         } else {
-          setCurrentStep(FlowStep.PLAN_READY);
+          setCurrentPhase(FlowPhase.CONFIRMING);
         }
-      } else {
-        // Start inactivity timeout for incomplete plans
-        startInactivityTimeout();
       }
 
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: 'I apologize, but I encountered an error. Please try again.',
+        content: 'I encountered a technical hiccup. Could you please try sending your message again?',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
-      startInactivityTimeout();
+      setLastMessageRole('assistant');
     }
 
     setIsLoading(false);
+    setCollectState(prev => ({ ...prev, inFlight: false }));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -229,20 +315,33 @@ const NFTCreator: React.FC = () => {
   };
 
   const modifyPlan = () => {
-    setCurrentStep(FlowStep.CONVERSATION);
+    clearNudgeTimeout();
+    setCurrentPhase(FlowPhase.COLLECTING);
     const modifyMessage: Message = {
       role: 'assistant',
       content: "What would you like to change about your NFT collection plan? I can help you modify any aspect of it.",
       timestamp: new Date()
     };
     setMessages(prev => [...prev, modifyMessage]);
+    setLastMessageRole('assistant');
+    
+    // Reset collect state
+    const missing = computeMissing(nftPlan);
+    setCollectState({
+      missing,
+      awaitingField: getAwaitingField(missing),
+      inFlight: false,
+      nudgeCountForField: {},
+      lastNudgeKey: undefined
+    });
   };
 
   const handleSignTransaction = async () => {
     if (!nftPlan.collectionName || !nftPlan.totalSupply || !nftPlan.mediaUrl || isMinting) return;
 
+    clearNudgeTimeout();
     setIsMinting(true);
-    setCurrentStep(FlowStep.SIGNING);
+    setCurrentPhase(FlowPhase.MINTING);
 
     try {
       // Step 1: Build transaction
@@ -305,8 +404,32 @@ const NFTCreator: React.FC = () => {
         transactionHash: hash
       };
 
+      // Save the creation to our database
+      try {
+        await fetch('/api/creations/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'nft',
+            userAddress: publicKey,
+            network,
+            plan: nftPlan,
+            txHash: hash,
+            name: nftPlan.collectionName,
+            symbol: nftPlan.symbol,
+            supply: nftPlan.totalSupply,
+            description: nftPlan.description,
+            royalties: nftPlan.royaltiesPct,
+            imageUrl: nftPlan.mediaUrl
+          })
+        });
+      } catch (saveError) {
+        console.error('Failed to save creation:', saveError);
+        // Don't fail the whole flow if saving fails
+      }
+
       setFinalCollection(newCollection);
-      setCurrentStep(FlowStep.SUCCESS);
+      setCurrentPhase(FlowPhase.DONE);
 
     } catch (error) {
       console.error('Transaction failed:', error);
@@ -332,13 +455,23 @@ const NFTCreator: React.FC = () => {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
-      setCurrentStep(FlowStep.PLAN_READY);
+      setCurrentPhase(FlowPhase.CONFIRMING);
     }
 
     setIsMinting(false);
   };
 
   const generateImage = async (prompt: string) => {
+    if (!prompt || prompt.trim().length < 5) {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: "Please provide a more detailed description for your NFT image. I need at least 5 characters to create something amazing! 🎨",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
+
     setIsGeneratingImage(true);
     try {
       const response = await fetch('/api/ai/image/generate', {
@@ -347,24 +480,25 @@ const NFTCreator: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt,
+          prompt: prompt.trim(),
           size: "1024x1024"
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
       setGeneratedImage(data.imageUrl);
-      setImagePrompt(prompt);
+      setImagePrompt(data.prompt || prompt); // Use cleaned prompt if available
 
     } catch (error) {
       console.error('Image generation failed:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: `Failed to generate image: ${error instanceof Error ? error.message : 'Unknown error'}. Please try a different prompt.`,
+        content: `I had trouble generating that image: ${error instanceof Error ? error.message : 'Unknown error'}\n\n🎨 Try being more specific about what you want to see! For example: "a majestic dragon with golden scales" or "a cute robot in a futuristic city".`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -379,7 +513,7 @@ const NFTCreator: React.FC = () => {
         mediaUrl: generatedImage,
         mediaPrompt: imagePrompt
       }));
-      setCurrentStep(FlowStep.PLAN_READY);
+      setCurrentPhase(FlowPhase.CONFIRMING);
     }
   };
 
@@ -391,14 +525,21 @@ const NFTCreator: React.FC = () => {
 
   const refineImage = () => {
     setGeneratedImage(null);
+    // Add a helpful message
+    const refineMessage: Message = {
+      role: 'assistant',
+      content: "✨ Let's refine your image! Edit the prompt below to describe exactly what you want to see, then generate a new image.",
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, refineMessage]);
   };
 
   const resetFlow = () => {
-    clearInactivityTimeout();
-    setCurrentStep(FlowStep.CONVERSATION);
+    clearNudgeTimeout();
+    setCurrentPhase(FlowPhase.COLLECTING);
     setMessages([{
       role: 'assistant',
-      content: "🧙‍♂️ Ready for another magical NFT creation? Tell me what you'd like to create!",
+      content: "🧙‍♂️ Ready for another magical NFT creation? Let's bring your next digital collection to life!\\n\\n✨ **What would you like to name your new NFT collection?**\\n\\n(Remember to choose something descriptive and unique!)",
       timestamp: new Date()
     }]);
     setNftPlan({
@@ -412,7 +553,16 @@ const NFTCreator: React.FC = () => {
     setGeneratedImage(null);
     setImagePrompt('');
     setIsGeneratingImage(false);
-    startInactivityTimeout();
+    setLastMessageRole('assistant');
+    
+    // Reset collect state
+    setCollectState({
+      missing: ['collectionName', 'symbol', 'totalSupply', 'mediaUrlOrPrompt'],
+      awaitingField: 'collectionName',
+      inFlight: false,
+      nudgeCountForField: {},
+      lastNudgeKey: undefined
+    });
   };
 
   if (!isConnected) {
@@ -458,32 +608,32 @@ const NFTCreator: React.FC = () => {
         <div className="flex items-center justify-center mb-8">
           <div className="flex items-center gap-4">
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-              currentStep === FlowStep.CONVERSATION ? 'bg-primary text-primary-foreground' : 
-              [FlowStep.PLAN_READY, FlowStep.SIGNING, FlowStep.SUCCESS].includes(currentStep) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              currentPhase === FlowPhase.COLLECTING ? 'bg-primary text-primary-foreground' : 
+              [FlowPhase.IMAGE_GENERATION, FlowPhase.CONFIRMING, FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">1</span>
               Chat with AI
             </div>
             <div className="w-8 h-px bg-border" />
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-              currentStep === FlowStep.IMAGE_GENERATION ? 'bg-primary text-primary-foreground' : 
-              [FlowStep.PLAN_READY, FlowStep.SIGNING, FlowStep.SUCCESS].includes(currentStep) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              currentPhase === FlowPhase.IMAGE_GENERATION ? 'bg-primary text-primary-foreground' : 
+              [FlowPhase.CONFIRMING, FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">2</span>
               Generate Image
             </div>
             <div className="w-8 h-px bg-border" />
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-              currentStep === FlowStep.PLAN_READY ? 'bg-primary text-primary-foreground' : 
-              [FlowStep.SIGNING, FlowStep.SUCCESS].includes(currentStep) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              currentPhase === FlowPhase.CONFIRMING ? 'bg-primary text-primary-foreground' : 
+              [FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">3</span>
               Review Plan
             </div>
             <div className="w-8 h-px bg-border" />
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-              currentStep === FlowStep.SIGNING ? 'bg-primary text-primary-foreground' : 
-              currentStep === FlowStep.SUCCESS ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              currentPhase === FlowPhase.MINTING ? 'bg-primary text-primary-foreground' : 
+              currentPhase === FlowPhase.DONE ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">4</span>
               Deploy NFTs
@@ -492,7 +642,7 @@ const NFTCreator: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        {currentStep === FlowStep.CONVERSATION && (
+        {currentPhase === FlowPhase.COLLECTING && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Chat Interface */}
             <Card className="lg:col-span-2">
@@ -576,11 +726,15 @@ const NFTCreator: React.FC = () => {
                   />
                   <Button
                     onClick={sendMessage}
-                    disabled={!currentMessage.trim() || isLoading}
+                    disabled={!currentMessage.trim() || isLoading || collectState.inFlight}
                     size="icon"
                     className="self-end"
                   >
-                    <Send className="w-4 h-4" />
+                    {collectState.inFlight ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -683,7 +837,7 @@ const NFTCreator: React.FC = () => {
           </div>
         )}
 
-        {currentStep === FlowStep.IMAGE_GENERATION && (
+        {currentPhase === FlowPhase.IMAGE_GENERATION && (
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -740,22 +894,27 @@ const NFTCreator: React.FC = () => {
                     <label className="text-sm font-medium text-muted-foreground">Prompt Used</label>
                     <p className="text-sm mt-1">{imagePrompt}</p>
                   </div>
-                  <div className="flex gap-3">
-                    <Button onClick={regenerateImage} variant="outline" disabled={isGeneratingImage}>
-                      {isGeneratingImage ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-4 h-4 mr-2" />
-                      )}
-                      Regenerate
-                    </Button>
-                    <Button onClick={refineImage} variant="outline">
-                      Edit Prompt
-                    </Button>
-                    <Button onClick={acceptImage} className="flex-1">
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Button onClick={regenerateImage} variant="outline" disabled={isGeneratingImage} className="flex-1">
+                        {isGeneratingImage ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 mr-2" />
+                        )}
+                        Regenerate Same
+                      </Button>
+                      <Button onClick={refineImage} variant="outline" className="flex-1">
+                        ✏️ Edit & Regenerate
+                      </Button>
+                    </div>
+                    <Button onClick={acceptImage} className="w-full" size="lg">
                       <CheckCircle className="w-4 h-4 mr-2" />
-                      Accept Image
+                      Accept This Image
                     </Button>
+                    <p className="text-xs text-center text-muted-foreground">
+                      💡 Tip: You can regenerate or edit the prompt until you're happy with the result!
+                    </p>
                   </div>
                 </div>
               )}
@@ -763,7 +922,7 @@ const NFTCreator: React.FC = () => {
           </Card>
         )}
 
-        {currentStep === FlowStep.PLAN_READY && nftPlan.isComplete && (
+        {currentPhase === FlowPhase.CONFIRMING && nftPlan.isComplete && (
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -843,7 +1002,7 @@ const NFTCreator: React.FC = () => {
           </Card>
         )}
 
-        {currentStep === FlowStep.SIGNING && (
+        {currentPhase === FlowPhase.MINTING && (
           <Card className="max-w-2xl mx-auto">
             <CardContent className="py-12 text-center">
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
@@ -856,7 +1015,7 @@ const NFTCreator: React.FC = () => {
           </Card>
         )}
 
-        {currentStep === FlowStep.SUCCESS && finalCollection && (
+        {currentPhase === FlowPhase.DONE && finalCollection && (
           <Card className="max-w-2xl mx-auto">
             <CardContent className="py-12 text-center">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-6" />

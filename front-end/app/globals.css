@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
+    
+    /* HackMeridian Brand Colors */
+    --hackmeridian-yellow: 48 100% 50%;    /* #FFD600 - Primary accent */
+    --hackmeridian-black: 0 0% 0%;         /* #000000 - Headlines, bold text */
+    --hackmeridian-gray: 0 0% 40%;         /* #666666 - Body text */
+    --hackmeridian-light-gray: 0 0% 90%;   /* #E5E5E5 - Separators */
+    
+    /* Light theme (default) */
+    --background: 0 0% 100%;               /* White background */
+    --foreground: var(--hackmeridian-black);
+    --card: 0 0% 100%;
+    --card-foreground: var(--hackmeridian-black);
+    --popover: 0 0% 100%;
+    --popover-foreground: var(--hackmeridian-black);
+    --primary: var(--hackmeridian-yellow);
+    --primary-foreground: var(--hackmeridian-black);
+    --secondary: var(--hackmeridian-light-gray);
+    --secondary-foreground: var(--hackmeridian-black);
+    --muted: var(--hackmeridian-light-gray);
+    --muted-foreground: var(--hackmeridian-gray);
+    --accent: var(--hackmeridian-yellow);
+    --accent-foreground: var(--hackmeridian-black);
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: var(--hackmeridian-light-gray);
+    --input: var(--hackmeridian-light-gray);
+    --ring: var(--hackmeridian-yellow);
+    --chart-1: var(--hackmeridian-yellow);
+    --chart-2: var(--hackmeridian-black);
+    --chart-3: var(--hackmeridian-gray);
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+  
+  .dark {
+    /* Dark theme with overlay for readability */
+    --background: 0 0% 8%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 95%;
+    --primary: var(--hackmeridian-yellow);
+    --primary-foreground: var(--hackmeridian-black);
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 65%;
+    --accent: var(--hackmeridian-yellow);
+    --accent-foreground: var(--hackmeridian-black);
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: var(--hackmeridian-yellow);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image: url('/background.webp');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+  
+  /* Typography classes for HackMeridian style with proper contrast */
+  .hackmeridian-headline {
+    @apply font-bold uppercase tracking-wide text-text-light dark:text-text-dark;
+  }
+  
+  .hackmeridian-tagline {
+    @apply italic text-hk-gray dark:text-gray-300;
+  }
+  
+  .wizard-text {
+    @apply font-medium text-text-light dark:text-text-dark;
+  }
+  
+  /* Background overlay for hero sections */
+  .bg-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(80% 60% at 50% 10%, rgba(0,0,0,.35), rgba(0,0,0,0));
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  .bg-overlay > * {
+    position: relative;
+    z-index: 2;
+  }
+  
+  /* Ensure readable text colors */
+  .text-readable {
+    @apply text-text-light dark:text-text-dark;
+  }
+  
+  .text-readable-muted {
+    @apply text-hk-gray dark:text-gray-300;
+  }
+}

@@ -6,20 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
-import { PiggyBank, TrendingUp, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
+import { PiggyBank, TrendingUp, ExternalLink, AlertCircle } from 'lucide-react';
 import { supply, borrow, buildLendingPlan, LendingPlan } from '@/lib/blend';
 import { TransactionResult } from '@/lib/soroban';
-import { StellarWalletsKit, WalletNetwork } from '@creit.tech/stellar-wallets-kit';
+import { useWallet } from '../providers/WalletProvider';
+import TopNav from '@/components/TopNav';
 
 const BLEND_MARKET_USDC_ID = process.env.NEXT_PUBLIC_BLEND_MARKET_USDC_ID!;
 
 export default function LendPage() {
-  const [walletKit, setWalletKit] = useState<StellarWalletsKit | null>(null);
-  const [publicKey, setPublicKey] = useState<string>('');
-  const [isConnected, setIsConnected] = useState(false);
+  const { publicKey, signTransaction, isConnected } = useWallet();
 
   // Form state
   const [marketId, setMarketId] = useState(BLEND_MARKET_USDC_ID);
@@ -33,33 +31,6 @@ export default function LendPage() {
   const [results, setResults] = useState<TransactionResult[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const connectWallet = async () => {
-    try {
-      const kit = new StellarWalletsKit({
-        network: WalletNetwork.TESTNET,
-        selectedWalletId: 'freighter',
-        modules: []
-      });
-
-      await kit.openModal({
-        onWalletSelected: async (option) => {
-          try {
-            kit.setWallet(option.id);
-            const { address } = await kit.getAddress();
-            
-            setWalletKit(kit);
-            setPublicKey(address);
-            setIsConnected(true);
-            setError(null);
-          } catch (error) {
-            setError(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
-        }
-      });
-    } catch (error) {
-      setError(`Failed to initialize wallet: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
 
   const buildPlan = () => {
     if (!supplyAmount && !borrowAmount) {
@@ -84,7 +55,7 @@ export default function LendPage() {
   };
 
   const executeLending = async () => {
-    if (!walletKit || !publicKey || !plan) {
+    if (!publicKey || !plan) {
       setError('Wallet not connected or plan not built');
       return;
     }
@@ -99,7 +70,7 @@ export default function LendPage() {
         const supplyResult = await supply({
           marketId,
           amount: supplyAmount,
-          walletKit,
+          signTransaction,
           userAddress: publicKey
         });
         txResults.push(supplyResult);
@@ -113,7 +84,7 @@ export default function LendPage() {
         const borrowResult = await borrow({
           marketId,
           amount: borrowAmount,
-          walletKit,
+          signTransaction,
           userAddress: publicKey
         });
         txResults.push(borrowResult);
@@ -129,37 +100,19 @@ export default function LendPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 max-w-2xl">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Lending & Borrowing</h1>
-          <p className="text-muted-foreground">
-            Supply and borrow assets using Blend Protocol on Stellar Testnet
-          </p>
-        </div>
+    <div className="min-h-screen bg-bg-light dark:bg-bg-dark">
+      <TopNav />
+      <div className="pt-28">
+        <div className="max-w-xl mx-auto p-6 space-y-4">
+          <div>
+            <h1 className="text-3xl font-bold">Lending & Borrowing</h1>
+            <p className="text-muted-foreground">
+              Supply and borrow assets using Blend Protocol on Stellar Testnet
+            </p>
+          </div>
 
-        {/* Wallet Connection */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Wallet Connection</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isConnected ? (
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <span>Connected: {publicKey.substring(0, 8)}...{publicKey.slice(-8)}</span>
-                <Badge className="bg-green-100 text-green-700">Testnet</Badge>
-              </div>
-            ) : (
-              <Button onClick={connectWallet} className="w-full">
-                Connect Freighter Wallet
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Lending Form */}
-        <Card>
+          {/* Lending Form */}
+          <Card>
           <CardHeader>
             <CardTitle>Lending Configuration</CardTitle>
           </CardHeader>
@@ -317,7 +270,8 @@ export default function LendPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

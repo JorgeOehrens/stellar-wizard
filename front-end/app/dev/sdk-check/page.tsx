@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AlertCircle, CheckCircle, Clock, Wallet, Server, FileText } from 'lucide-react';
-import { StellarWalletsKit, WalletNetwork } from '@creit.tech/stellar-wallets-kit';
-import { Contract, SorobanRpc, TransactionBuilder, Networks, Account, Operation } from '@stellar/stellar-sdk';
+import { Contract, rpc, TransactionBuilder, Account, Operation } from '@stellar/stellar-sdk';
+import { useWallet } from '../../providers/WalletProvider';
+import { useNetwork } from '../../providers/NetworkProvider';
+import TopNav from '@/components/TopNav';
 
-const SOROBAN_RPC_URL = process.env.NEXT_PUBLIC_SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org';
 const TEST_TOKEN_CONTRACT_ID = process.env.NEXT_PUBLIC_TEST_TOKEN_CONTRACT_ID || 'CBQJQF4D7H5E34MS3M54IG7HINNYYVSBQO5K7ZCKTYIQIYGRX72UKGZ5';
 
 interface TestResult {
@@ -19,13 +20,14 @@ interface TestResult {
 }
 
 export default function SdkCheckPage() {
-  const [walletKit, setWalletKit] = useState<StellarWalletsKit | null>(null);
-  const [publicKey, setPublicKey] = useState<string>('');
-  const [rpcClient, setRpcClient] = useState<SorobanRpc.Server | null>(null);
+  const { publicKey, signTransaction, isConnected } = useWallet();
+  const { network, getRpcUrl, getNetworkPassphrase } = useNetwork();
+  const [rpcClient, setRpcClient] = useState<rpc.Server | null>(null);
 
   useEffect(() => {
-    setRpcClient(new SorobanRpc.Server(SOROBAN_RPC_URL));
-  }, []);
+    const rpcUrl = getRpcUrl();
+    setRpcClient(new rpc.Server(rpcUrl));
+  }, [network, getRpcUrl]);
   
   const [walletTest, setWalletTest] = useState<TestResult>({ status: 'pending', message: 'Not started' });
   const [rpcTest, setRpcTest] = useState<TestResult>({ status: 'pending', message: 'Not started' });
@@ -67,41 +69,19 @@ export default function SdkCheckPage() {
     );
   };
 
-  const connectWallet = async () => {
-    setWalletTest({ status: 'running', message: 'Connecting to Freighter...' });
+  const testWalletConnection = () => {
+    setWalletTest({ status: 'running', message: 'Checking wallet connection...' });
     
-    try {
-      const kit = new StellarWalletsKit({
-        network: WalletNetwork.TESTNET,
-        selectedWalletId: 'freighter',
-        modules: []
+    if (isConnected && publicKey) {
+      setWalletTest({ 
+        status: 'success', 
+        message: 'Wallet connected successfully',
+        data: { address: publicKey.substring(0, 8) + '...' + publicKey.substring(publicKey.length - 8) }
       });
-
-      await kit.openModal({
-        onWalletSelected: async (option) => {
-          try {
-            kit.setWallet(option.id);
-            const { address } = await kit.getAddress();
-            
-            setWalletKit(kit);
-            setPublicKey(address);
-            setWalletTest({ 
-              status: 'success', 
-              message: 'Connected successfully',
-              data: { address: address.substring(0, 8) + '...' + address.substring(address.length - 8) }
-            });
-          } catch (error) {
-            setWalletTest({ 
-              status: 'error', 
-              message: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
-            });
-          }
-        }
-      });
-    } catch (error) {
+    } else {
       setWalletTest({ 
         status: 'error', 
-        message: `Failed to initialize wallet: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        message: 'Wallet not connected. Please connect using the navigation bar.' 
       });
     }
   };
@@ -121,7 +101,7 @@ export default function SdkCheckPage() {
         message: 'RPC connection successful',
         data: { 
           ledger: response.sequence,
-          url: SOROBAN_RPC_URL
+          url: getRpcUrl()
         }
       });
     } catch (error) {
@@ -133,7 +113,7 @@ export default function SdkCheckPage() {
   };
 
   const testSignTransaction = async () => {
-    if (!walletKit || !publicKey) {
+    if (!publicKey || !signTransaction) {
       setSignTest({ status: 'error', message: 'Wallet not connected' });
       return;
     }
@@ -144,7 +124,7 @@ export default function SdkCheckPage() {
       const account = new Account(publicKey, '0');
       const transaction = new TransactionBuilder(account, {
         fee: '100',
-        networkPassphrase: Networks.TESTNET,
+        networkPassphrase: getNetworkPassphrase(),
       })
       .addOperation(Operation.bumpSequence({ bumpTo: '1' }))
       .setTimeout(30)
@@ -152,8 +132,8 @@ export default function SdkCheckPage() {
 
       const xdr = transaction.toXDR();
       
-      const { signedTxXdr } = await walletKit.signTransaction(xdr, {
-        networkPassphrase: Networks.TESTNET,
+      const signedTxXdr = await signTransaction(xdr, {
+        networkPassphrase: getNetworkPassphrase(),
       });
 
       setSignTest({ 
@@ -191,17 +171,17 @@ export default function SdkCheckPage() {
       
       const nameBuilder = new TransactionBuilder(account, {
         fee: '100',
-        networkPassphrase: Networks.TESTNET,
+        networkPassphrase: getNetworkPassphrase(),
       }).addOperation(nameOp).setTimeout(30);
       
       const symbolBuilder = new TransactionBuilder(account, {
         fee: '100', 
-        networkPassphrase: Networks.TESTNET,
+        networkPassphrase: getNetworkPassphrase(),
       }).addOperation(symbolOp).setTimeout(30);
       
       const decimalsBuilder = new TransactionBuilder(account, {
         fee: '100',
-        networkPassphrase: Networks.TESTNET,
+        networkPassphrase: getNetworkPassphrase(),
       }).addOperation(decimalsOp).setTimeout(30);
 
       const [nameResult, symbolResult, decimalsResult] = await Promise.all([
@@ -250,41 +230,43 @@ export default function SdkCheckPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">SDK Smoke Test</h1>
-          <p className="text-muted-foreground">
-            Test Stellar Wallets Kit and Soroban SDK integration with Testnet
-          </p>
-        </div>
+    <div className="min-h-screen bg-bg-light dark:bg-bg-dark">
+      <TopNav />
+      <div className="pt-28">
+        <div className="max-w-xl mx-auto p-6 space-y-4">
+          <div>
+            <h1 className="text-3xl font-bold">SDK Smoke Test</h1>
+            <p className="text-muted-foreground">
+              Test Stellar Wallets Kit and Soroban SDK integration with {network}
+            </p>
+          </div>
 
-        <div className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wallet className="h-5 w-5" />
-                Wallet Connection Test
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(walletTest.status)}
-                  <span>{walletTest.message}</span>
-                  {getStatusBadge(walletTest.status)}
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5" />
+                  Wallet Connection Test
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(walletTest.status)}
+                    <span>{walletTest.message}</span>
+                    {getStatusBadge(walletTest.status)}
+                  </div>
+                  <Button onClick={testWalletConnection} disabled={walletTest.status === 'running'}>
+                    Check Connection
+                  </Button>
                 </div>
-                <Button onClick={connectWallet} disabled={walletTest.status === 'running'}>
-                  Connect Freighter
-                </Button>
-              </div>
-              {walletTest.data && (
-                <div className="text-sm text-muted-foreground">
-                  Connected Address: {walletTest.data.address}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {walletTest.data && (
+                  <div className="text-sm text-muted-foreground">
+                    Connected Address: {walletTest.data.address}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
           <Card>
             <CardHeader>
@@ -375,10 +357,11 @@ export default function SdkCheckPage() {
               )}
             </CardContent>
           </Card>
-        </div>
+          </div>
 
-        <div className="text-xs text-muted-foreground text-center">
-          Network: Testnet | RPC: {SOROBAN_RPC_URL}
+          <div className="text-xs text-muted-foreground text-center">
+            Network: {network} | RPC: {getRpcUrl()}
+          </div>
         </div>
       </div>
     </div>

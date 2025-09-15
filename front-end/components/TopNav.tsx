@@ -4,12 +4,15 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useWallet } from '../app/providers/WalletProvider';
+import { useNetwork } from '../app/providers/NetworkProvider';
 import { Button } from './ui/button';
 import StellarWizardLogo from './StellarWizardLogo';
 import ThemeToggle from './ThemeToggle';
+import NetworkToggle from './ui/NetworkToggle';
 
 const TopNav: React.FC = () => {
   const { publicKey, connect, disconnect, isConnected } = useWallet();
+  const { network } = useNetwork();
   const pathname = usePathname();
 
   const shortenPublicKey = (key: string): string => {
@@ -52,6 +55,12 @@ const TopNav: React.FC = () => {
               </Link>
             ))}
           </nav>
+
+          {/* Network Toggle */}
+          <NetworkToggle className="hidden lg:flex" />
+
+          {/* Network Badge */}
+          <NetworkToggle variant="badge" className="lg:hidden" />
 
           {/* Theme toggle */}
           <ThemeToggle />

@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
 import { WalletProvider } from './providers/WalletProvider'
 import { ThemeProvider } from './providers/ThemeProvider'
+import { NetworkProvider } from './providers/NetworkProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -33,9 +34,11 @@ html {
       </head>
       <body>
         <ThemeProvider>
-          <WalletProvider>
-            {children}
-          </WalletProvider>
+          <NetworkProvider>
+            <WalletProvider>
+              {children}
+            </WalletProvider>
+          </NetworkProvider>
         </ThemeProvider>
         <Analytics />
       </body>

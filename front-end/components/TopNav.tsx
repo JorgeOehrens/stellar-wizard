@@ -1,0 +1,92 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useWallet } from '../app/providers/WalletProvider';
+import { Button } from './ui/button';
+import StellarWizardLogo from './StellarWizardLogo';
+import ThemeToggle from './ThemeToggle';
+
+const TopNav: React.FC = () => {
+  const { publicKey, connect, disconnect, isConnected } = useWallet();
+  const pathname = usePathname();
+
+  const shortenPublicKey = (key: string): string => {
+    if (key.length <= 10) return key;
+    return `${key.slice(0, 4)}…${key.slice(-6)}`;
+  };
+
+  const navLinks = [
+    { href: '/', label: 'Home' },
+    { href: '/nfts', label: 'NFTs' },
+    { href: '/defi', label: 'DeFi' },
+    { href: '/swap', label: 'Swap' },
+    { href: '/lend', label: 'Lend' },
+    { href: '/dev/sdk-check', label: 'SDK Test' },
+    { href: '/about', label: 'About' },
+  ];
+
+  return (
+    <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+      <div className="rounded-2xl bg-black/30 dark:bg-white/5 backdrop-blur px-4 py-2 shadow-xl max-w-fit">
+        <div className="flex items-center gap-6">
+          {/* Logo - Icon + Wordmark */}
+          <Link href="/" className="flex items-center">
+            <StellarWizardLogo size={28} showText={true} variant="horizontal" />
+          </Link>
+
+          {/* Navigation links */}
+          <nav className="hidden md:flex items-center gap-4">
+            {navLinks.slice(1).map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`text-sm font-medium transition-colors px-3 py-1.5 rounded-lg ${
+                  pathname === link.href
+                    ? 'text-hk-yellow bg-white/10'
+                    : 'text-white/80 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Theme toggle */}
+          <ThemeToggle />
+
+          {/* Wallet connection */}
+          {isConnected ? (
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-lg">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-xs font-mono text-white">
+                  {shortenPublicKey(publicKey!)}
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={disconnect}
+                className="h-8 text-xs border-white/20 text-white/80 hover:bg-white/10 bg-transparent"
+              >
+                Disconnect
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              onClick={connect}
+              className="h-8 text-xs bg-hk-yellow text-black font-semibold hover:bg-hk-yellow/90"
+            >
+              Connect Wallet
+            </Button>
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+export default TopNav;

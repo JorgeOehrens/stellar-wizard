@@ -9,6 +9,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  transpilePackages: ['stellar-social-sdk'],
   webpack: (config, { dev, isServer }) => {
     // Handle Node.js modules that can't be used in the browser
     config.resolve.fallback = {
@@ -26,6 +27,12 @@ const nextConfig = {
       http: false,
       https: false,
       zlib: false,
+    };
+
+    // Add alias for stellar-social-sdk
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'stellar-social-sdk': './stellar-social-sdk',
     };
 
     // Ignore problematic Node.js modules

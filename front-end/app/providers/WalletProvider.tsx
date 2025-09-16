@@ -7,8 +7,8 @@ import {
   FreighterModule,
   FREIGHTER_ID
 } from '@creit.tech/stellar-wallets-kit';
-import { StellarSocialSDK, StellarSocialAccount } from '../../../stellar-social-sdk/dist/index.esm.js';
-import type { SocialAuthConfig } from '../../../stellar-social-sdk/dist/index.d.ts';
+import { StellarSocialSDK, StellarSocialAccount } from '../../stellar-social-sdk/dist/index.esm.js';
+import type { SocialAuthConfig } from '../../stellar-social-sdk/dist/index.d.ts';
 import { useNetwork } from './NetworkProvider';
 
 type WalletAuthMethod = 'kit' | 'google';

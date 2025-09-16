@@ -58,6 +58,7 @@ const TopNav: React.FC = () => {
     { href: '/dashboard', label: 'Created' },
     { href: '/nfts', label: 'NFTs' },
     // { href: '/marketplace', label: 'Marketplace' },
+
     // { href: '/defi', label: 'DeFi' },
     // { href: '/swap', label: 'Swap' },
     // { href: '/lend', label: 'Lend' },

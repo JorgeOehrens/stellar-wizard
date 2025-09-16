@@ -1,0 +1,127 @@
+/* Markdown rendering styles for chat messages */
+
+/* Code highlighting theme overrides */
+.hljs {
+  @apply bg-gray-900 text-gray-100 p-4 rounded-lg !important;
+}
+
+.dark .hljs {
+  @apply bg-gray-800 text-gray-100 !important;
+}
+
+/* Prose styling for markdown content */
+.prose {
+  @apply text-gray-800;
+}
+
+.prose-invert {
+  @apply text-gray-200;
+}
+
+.prose h1, .prose-invert h1 {
+  @apply text-xl font-bold mb-3 mt-4;
+}
+
+.prose h2, .prose-invert h2 {
+  @apply text-lg font-semibold mb-2 mt-3;
+}
+
+.prose h3, .prose-invert h3 {
+  @apply text-base font-medium mb-2 mt-3;
+}
+
+.prose p, .prose-invert p {
+  @apply mb-3 leading-relaxed;
+}
+
+.prose ul, .prose-invert ul {
+  @apply list-disc list-inside mb-3 space-y-1;
+}
+
+.prose ol, .prose-invert ol {
+  @apply list-decimal list-inside mb-3 space-y-1;
+}
+
+.prose li, .prose-invert li {
+  @apply mb-1;
+}
+
+.prose blockquote, .prose-invert blockquote {
+  @apply border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 pl-4 py-2 my-3 italic;
+}
+
+.prose table, .prose-invert table {
+  @apply min-w-full border border-gray-300 dark:border-gray-600 my-3;
+}
+
+.prose thead, .prose-invert thead {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+.prose th, .prose-invert th {
+  @apply border border-gray-300 dark:border-gray-600 px-3 py-2 text-left font-semibold;
+}
+
+.prose td, .prose-invert td {
+  @apply border border-gray-300 dark:border-gray-600 px-3 py-2;
+}
+
+.prose a, .prose-invert a {
+  @apply text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline;
+}
+
+.prose hr, .prose-invert hr {
+  @apply border-t border-gray-300 dark:border-gray-600 my-4;
+}
+
+.prose strong, .prose-invert strong {
+  @apply font-semibold;
+}
+
+.prose em, .prose-invert em {
+  @apply italic;
+}
+
+/* Inline code styling */
+.prose code:not(.hljs), .prose-invert code:not(.hljs) {
+  @apply bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+/* Block code styling */
+.prose pre, .prose-invert pre {
+  @apply bg-gray-900 dark:bg-gray-800 rounded-lg p-4 my-3 overflow-x-auto;
+}
+
+.prose pre code, .prose-invert pre code {
+  @apply bg-transparent p-0 text-gray-100 font-mono text-sm;
+}
+
+/* Chat message specific styling */
+.chat-message .prose, .chat-message .prose-invert {
+  @apply text-sm max-w-none;
+}
+
+.chat-message .prose h1, .chat-message .prose-invert h1 {
+  @apply text-lg font-bold mb-2 mt-2;
+}
+
+.chat-message .prose h2, .chat-message .prose-invert h2 {
+  @apply text-base font-semibold mb-2 mt-2;
+}
+
+.chat-message .prose h3, .chat-message .prose-invert h3 {
+  @apply text-sm font-medium mb-1 mt-2;
+}
+
+.chat-message .prose p, .chat-message .prose-invert p {
+  @apply mb-2;
+}
+
+.chat-message .prose ul, .chat-message .prose-invert ul,
+.chat-message .prose ol, .chat-message .prose-invert ol {
+  @apply mb-2 space-y-1;
+}
+
+.chat-message .prose blockquote, .chat-message .prose-invert blockquote {
+  @apply my-2 py-1;
+}

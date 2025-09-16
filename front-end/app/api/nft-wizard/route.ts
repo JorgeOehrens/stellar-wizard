@@ -28,7 +28,6 @@ Required information:
 - Collection name (1-32 characters)
 - Symbol (3-12 characters, uppercase letters/numbers)
 - Total supply/Number of NFTs (1-10000)
-- Media URL (valid URL format) OR Media Prompt (text description for AI image generation)
 
 Optional information:
 - Description (up to 500 characters)
@@ -44,7 +43,6 @@ Validation rules:
 - Total supply: 1-10000 NFTs
 - Royalty percentage: 0-10%
 - Stellar addresses: must start with G and be exactly 56 characters
-- Media URL: must be a valid URL (http/https/ipfs)
 
 You should:
 1. Ask follow-up questions if information is missing or unclear
@@ -101,14 +99,14 @@ export async function POST(request: NextRequest) {
                 maximum: 10000,
                 description: 'Total number of NFTs to mint (1-10000)',
               },
-              mediaUrl: {
-                type: 'string',
-                description: 'Media or IPFS URL for the collection',
-              },
-              mediaPrompt: {
-                type: 'string',
-                description: 'Text prompt for AI image generation if mediaUrl is not provided',
-              },
+              // mediaUrl: {
+              //   type: 'string',
+              //   description: 'Media or IPFS URL for the collection',
+              // },
+              // mediaPrompt: {
+              //   type: 'string',
+              //   description: 'Text prompt for AI image generation if mediaUrl is not provided',
+              // },
               description: {
                 type: 'string',
                 description: 'Collection description (up to 500 characters)',

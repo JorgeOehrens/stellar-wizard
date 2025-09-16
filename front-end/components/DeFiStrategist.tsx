@@ -171,6 +171,47 @@ const DeFiStrategist: React.FC = () => {
   const sendMessage = async () => {
     if (!currentMessage.trim() || isLoading) return;
 
+  const getDefaultStrategy = (): DeFiStrategy => ({
+    profile: {},
+    allocations: [],
+    totalEstimatedApy: 0,
+    totalRiskScore: 0,
+    warnings: [],
+    fees: { dappFee: 0, protocolFees: 0, gasEstimate: 0 },
+    network: 'TESTNET',
+    isComplete: false,
+    needsInfo: ['riskTolerance', 'investmentAmount', 'preferredAssets']
+  });
+
+  const [strategy, setStrategy] = useState<DeFiStrategy>(getDefaultStrategy());
+  const [swapPlan, setSwapPlan] = useState<SwapPlan | null>(null);
+  const [swapTransaction, setSwapTransaction] = useState<any>(null);
+  const [executedStrategy, setExecutedStrategy] = useState<ExecutedStrategy | null>(null);
+  const [executedSwap, setExecutedSwap] = useState<ExecutedSwap | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    if (swapPlan) {
+      setSwapPlan(prev => prev ? ({
+        ...prev,
+        from: publicKey || '',
+        to: publicKey || '',
+        network: network === 'TESTNET' ? 'testnet' : 'mainnet'
+      }) : null);
+    }
+  }, [publicKey, network]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const sendMessage = async () => {
+    if (!currentMessage.trim() || isLoading) return;
+
     const userMessage: Message = {
       role: 'user',
       content: currentMessage,

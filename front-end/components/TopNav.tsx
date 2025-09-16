@@ -24,11 +24,11 @@ const TopNav: React.FC = () => {
     { href: '/', label: 'Home' },
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/nfts', label: 'NFTs' },
-    { href: '/defi', label: 'DeFi' },
+    // { href: '/defi', label: 'DeFi' },
     // { href: '/swap', label: 'Swap' },
     // { href: '/lend', label: 'Lend' },
     // { href: '/dev/sdk-check', label: 'SDK Test' },
-    { href: '/about', label: 'About' },
+    // { href: '/about', label: 'About' },
   ];
 
   return (

@@ -82,7 +82,7 @@ const NFTCreator: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "🧙‍♂️ **Welcome, fellow creator!**\\n\\nI'm the Stellar NFT Wizard, here to help you bring your digital collection to life on the Stellar blockchain.\\n\\n✨ **What I can help you with:**\\n- Create NFT collections with custom names and symbols\\n- Generate stunning AI artwork for your NFTs\\n- Set up royalties and airdrops\\n- Deploy everything to Stellar's network\\n\\n💬 **Would you like to start by naming your NFT collection, or do you have a question first?**\\n\\nFeel free to ask questions or jump right in!",
+      content: "🧙‍♂️ **Welcome, fellow creator!**\n\nI'm the Stellar NFT Wizard, here to help you bring your digital collection to life on the Stellar blockchain.\n\n✨ **What I can help you with:**\n- Create NFT collections with custom names and symbols\n- Generate stunning AI artwork for your NFTs\n- Set up royalties and airdrops\n- Deploy everything to Stellar's network\n\n💬 **Would you like to start by naming your NFT collection, or do you have a question first?**\n\nFeel free to ask questions or jump right in!",
       timestamp: new Date()
     }
   ]);
@@ -613,7 +613,7 @@ stellar contract invoke \\
 
       const assistantErrorMessage: Message = {
         role: 'assistant',
-        content: `${userErrorMessage}\\n\\n💡 **Alternative:** You can use the CLI commands shown in the previous step to mint directly via Stellar CLI.\\n\\nYour plan is saved - just click "Yes - Mint NFTs" to retry the UI mint.`,
+        content: `${userErrorMessage}\\n\\n💡 **Alternative:** You can use the CLI commands shown in the previous step to mint directly via Stellar CLI.\\n\\nYour plan is saved - just click "Mint NFTs" to retry the UI mint.`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, assistantErrorMessage]);
@@ -750,7 +750,7 @@ stellar contract invoke \\
             <Button
               onClick={handleQuickCreateNFT}
               disabled={isMinting || !isConnected}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-2"
+              className="bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 text-white px-6 py-2 shadow-lg hover:shadow-xl transition-all duration-300"
             >
               {isMinting ? (
                 <>
@@ -763,6 +763,7 @@ stellar contract invoke \\
                 </>
               ) : (
                 <>
+            
                   🚀 Quick Create & Sign NFT
                 </>
               )}
@@ -1125,7 +1126,7 @@ stellar contract invoke \\
                     disabled={!nftPlan.mediaUrl && !nftPlan.mediaPrompt}
                     className="flex-1"
                   >
-                    Yes - Show CLI Commands
+                    Yes
                   </Button>
                 </div>
               </div>
@@ -1232,7 +1233,7 @@ stellar contract invoke \\
                       Minting via UI...
                     </>
                   ) : (
-                    'Or Mint via UI'
+                    'Mint'
                   )}
                 </Button>
                 <Button onClick={resetFlow} variant="outline" className="flex-1">

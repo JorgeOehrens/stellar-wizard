@@ -45,7 +45,8 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
       case 'TESTNET':
         return process.env.NEXT_PUBLIC_SOROBAN_TESTNET_RPC_URL || 'https://soroban-testnet.stellar.org';
       case 'MAINNET':
-        return process.env.NEXT_PUBLIC_SOROBAN_MAINNET_RPC_URL || 'https://soroban-mainnet.stellar.org';
+        return process.env.NEXT_PUBLIC_SOROBAN_MAINNET_RPC_URL || 'https://rpc.ankr.com/stellar_soroban';
+
       default:
         return 'https://soroban-testnet.stellar.org';
     }

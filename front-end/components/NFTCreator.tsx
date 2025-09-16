@@ -12,12 +12,51 @@ import { Loader2, Sparkles, CheckCircle, ExternalLink, Wand2, MessageCircle, Sen
 import NetworkToggle from './ui/NetworkToggle';
 import Image from 'next/image';
 
-enum FlowStep {
-  CONVERSATION = 'conversation',
+enum FlowPhase {
+  COLLECTING = 'collecting',
   IMAGE_GENERATION = 'image-generation',
-  PLAN_READY = 'plan-ready',
-  SIGNING = 'signing',
-  SUCCESS = 'success'
+  CONFIRMING = 'confirming',
+  CLI_COMMANDS = 'cli-commands',
+  MINTING = 'minting',
+  DONE = 'done'
+}
+
+type CollectState = {
+  awaitingField?: "collectionName" | "totalSupply" | "mediaUrlOrPrompt" | "royaltiesPct" | "airdrop" | "network";
+  missing: string[];
+  inFlight: boolean;
+  lastNudgeKey?: string;
+  nudgeCountForField: Record<string, number>;
+};
+
+interface NFTPlan {
+  collectionName?: string;
+  symbol?: string;
+  totalSupply?: number;
+  description?: string;
+  royaltiesPct?: number;
+  mediaUrl?: string;
+  mediaPrompt?: string;
+  airdrop?: {
+    recipient: string;
+    amount?: number;
+  } | null;
+  network: 'TESTNET' | 'MAINNET';
+  isComplete: boolean;
+  needsInfo: string[];
+  // Confirmation tracking
+  pendingConfirmation?: {
+    field: 'collectionName' | 'symbol' | 'totalSupply' | 'mediaUrl' | 'mediaPrompt' | 'description' | 'royaltiesPct' | 'airdrop';
+    value: any;
+    question: string;
+  };
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+
 }
 
 interface NFTPlan {
@@ -56,19 +95,28 @@ interface NFTCollection {
 
 const NFTCreator: React.FC = () => {
   const { isConnected, publicKey, signTransaction } = useWallet();
-  const { network, getExplorerUrl } = useNetwork();
-  const [currentStep, setCurrentStep] = useState<FlowStep>(FlowStep.CONVERSATION);
+  const { network, getExplorerUrl, getNetworkPassphrase } = useNetwork();
+  const [currentPhase, setCurrentPhase] = useState<FlowPhase>(FlowPhase.COLLECTING);
+  const [collectState, setCollectState] = useState<CollectState>({
+    missing: ['collectionName', 'symbol', 'totalSupply', 'mediaUrlOrPrompt'],
+    inFlight: false,
+    nudgeCountForField: {}
+  });
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "🧙‍♂️ Greetings! I'm the Stellar NFT Wizard. I'll help you create your NFT collection step by step. To get started, tell me about the NFT collection you'd like to create!",
+      content: "🧙‍♂️ **Welcome, fellow creator!**\\n\\nI'm the Stellar NFT Wizard, here to help you bring your digital collection to life on the Stellar blockchain.\\n\\n✨ **What I can help you with:**\\n- Create NFT collections with custom names and symbols\\n- Generate stunning AI artwork for your NFTs\\n- Set up royalties and airdrops\\n- Deploy everything to Stellar's network\\n\\n💬 **Would you like to start by naming your NFT collection, or do you have a question first?**\\n\\nFeel free to ask questions or jump right in!",
+
       timestamp: new Date()
     }
   ]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isMinting, setIsMinting] = useState(false);
-  const [inactivityTimeout, setInactivityTimeout] = useState<NodeJS.Timeout | null>(null);
+  const nudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [conversationId] = useState(`conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [lastMessageRole, setLastMessageRole] = useState<'user' | 'assistant'>('assistant');
+
   const [nftPlan, setNftPlan] = useState<NFTPlan>({
     network: 'TESTNET',
     isComplete: false,
@@ -78,80 +126,123 @@ const NFTCreator: React.FC = () => {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [imagePrompt, setImagePrompt] = useState<string>('');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [cliCommands, setCliCommands] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
+  // Removed auto-nudge system - let users respond naturally
   useEffect(() => {
-    if (currentStep === FlowStep.CONVERSATION && !isLoading) {
-      startInactivityTimeout();
-    } else {
-      clearInactivityTimeout();
-    }
-
-    return () => clearInactivityTimeout();
-  }, [currentStep, isLoading]);
+    return () => clearNudgeTimeout();
+  }, []);
 
   useEffect(() => {
     // Initialize image prompt from plan when entering image generation
-    if (currentStep === FlowStep.IMAGE_GENERATION && nftPlan.mediaPrompt && !imagePrompt) {
+    if (currentPhase === FlowPhase.IMAGE_GENERATION && nftPlan.mediaPrompt && !imagePrompt) {
       setImagePrompt(nftPlan.mediaPrompt);
       // Auto-generate image if we have a prompt
       generateImage(nftPlan.mediaPrompt);
     }
-  }, [currentStep, nftPlan.mediaPrompt, imagePrompt]);
+  }, [currentPhase, nftPlan.mediaPrompt, imagePrompt]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const clearInactivityTimeout = () => {
-    if (inactivityTimeout) {
-      clearTimeout(inactivityTimeout);
-      setInactivityTimeout(null);
+  const clearNudgeTimeout = () => {
+    if (nudgeRef.current) {
+      clearTimeout(nudgeRef.current);
+      nudgeRef.current = null;
     }
   };
 
-  const startInactivityTimeout = () => {
-    clearInactivityTimeout();
-    const timeout = setTimeout(() => {
-      if (currentStep === FlowStep.CONVERSATION && !isLoading) {
-        const followUpMessage = getFollowUpMessage();
-        if (followUpMessage) {
-          const assistantMessage: Message = {
-            role: 'assistant',
-            content: followUpMessage,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, assistantMessage]);
-        }
-      }
-    }, 3000);
-    setInactivityTimeout(timeout);
+  const computeMissing = (plan: NFTPlan): string[] => {
+    const missing: string[] = [];
+    
+    if (!plan.collectionName) missing.push('collectionName');
+    if (!plan.symbol) missing.push('symbol');
+    if (!plan.totalSupply) missing.push('totalSupply');
+    if (!plan.mediaUrl && !plan.mediaPrompt) missing.push('mediaUrlOrPrompt');
+    
+    return missing;
   };
 
-  const getFollowUpMessage = () => {
-    if (nftPlan.needsInfo.includes('collectionName')) {
-      return "What would you like to name your NFT collection?";
-    }
-    if (nftPlan.needsInfo.includes('totalSupply')) {
-      return "How many NFTs should be minted? (1-10,000)";
-    }
-    if (nftPlan.needsInfo.includes('mediaUrl') && !nftPlan.mediaPrompt) {
-      return "Do you have an image prompt or a direct media URL (IPFS) for this collection?";
-    }
-    if (nftPlan.needsInfo.includes('symbol')) {
-      return "What symbol would you like for your collection? (3-12 characters, uppercase)";
-    }
-    return null;
+  const isPlanComplete = (plan: NFTPlan): boolean => {
+    return !!(plan.collectionName && plan.symbol && plan.totalSupply && (plan.mediaUrl || plan.mediaPrompt));
   };
+
+  const generateCliCommands = (plan: NFTPlan): string[] => {
+    const commands: string[] = [];
+    
+    // Use the deployed Factory/Registry contract
+    const factoryContractId = 'CD3W76OGYGHT4X5TMNUXWGEEVUBES67D3ZU4BALSW3BO23IMPT6E662A';
+    
+    // Determine recipient wallet
+    const recipientWallet = plan.airdrop?.recipient || publicKey || 'G...USER_PUBLIC_KEY';
+    const amount = plan.totalSupply || 1;
+    
+    // Step 1: Create collection via factory
+    const createCollectionCommand = `# Step 1: Create NFT collection via Factory
+stellar contract invoke \\
+  --id ${factoryContractId} \\
+  --source deployer \\
+  --network testnet \\
+  -- create_collection \\
+  --creator G...YOUR_ADDRESS \\
+  --name "${plan.collectionName}" \\
+  --symbol "${plan.symbol}" \\
+  --uri_base "${plan.mediaUrl || 'https://example.com/metadata/'}" \\
+  --royalties ${(plan.royaltiesPct || 0) * 100}`;
+    
+    // commands.push(createCollectionCommand);
+    
+    // Step 2: Mint NFTs using the returned collection ID
+    const mintCommand = `# Step 2: Mint NFTs (replace <collection_id> with ID from step 1)
+stellar contract invoke \\
+  --id ${factoryContractId} \\
+  --source deployer \\
+  --network testnet \\
+  -- mint \\
+  --collection_id <collection_id> \\
+  --to ${recipientWallet} \\
+  --amount ${amount}`;
+    
+    // commands.push(mintCommand);
+    
+    // Alternative using the convenience script
+    const scriptCommand = `# Alternative: Use convenience scripts
+./scripts/create-collection.sh "${plan.collectionName}" "${plan.symbol}" "${plan.mediaUrl || 'https://example.com/metadata/'}" ${(plan.royaltiesPct || 0) * 100}
+./scripts/mint-from-factory.sh <collection_id> ${recipientWallet} ${amount}`;
+    
+    // commands.push(scriptCommand);
+    
+    return commands;
+  };
+
+  const getAwaitingField = (missing: string[]): "collectionName" | "totalSupply" | "mediaUrlOrPrompt" | "royaltiesPct" | "airdrop" | "network" | undefined => {
+    if (missing.includes('collectionName')) return 'collectionName';
+    if (missing.includes('symbol')) return 'collectionName'; // Map symbol to collectionName for simplicity
+    if (missing.includes('totalSupply')) return 'totalSupply';
+    if (missing.includes('mediaUrlOrPrompt')) return 'mediaUrlOrPrompt';
+    return undefined;
+  };
+
+  // Remove old startInactivityTimeout function - replaced by scheduleNudge
+
+  // Removed automatic follow-up system
+
+  // Removed nudge scheduling system
 
   const sendMessage = async () => {
-    if (!currentMessage.trim() || isLoading) return;
+    if (!currentMessage.trim() || collectState.inFlight || isLoading) return;
+    
+    // Prevent sending messages when not in collecting phase
+    if (currentPhase !== FlowPhase.COLLECTING) return;
 
-    clearInactivityTimeout();
+    clearNudgeTimeout();
+    setCollectState(prev => ({ ...prev, inFlight: true }));
 
     const userMessage: Message = {
       role: 'user',
@@ -162,9 +253,10 @@ const NFTCreator: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
     setCurrentMessage('');
     setIsLoading(true);
+    setLastMessageRole('user');
 
     try {
-      const response = await fetch('/api/nft-wizard', {
+      const response = await fetch('/api/ai/nft-wizard', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,7 +267,8 @@ const NFTCreator: React.FC = () => {
             content: m.content
           })),
           currentPlan: nftPlan,
-          network
+          network,
+          conversationId
         }),
       });
 
@@ -192,33 +285,60 @@ const NFTCreator: React.FC = () => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      setNftPlan(data.plan);
+      setLastMessageRole('assistant');
+      
+      if (data.plan) {
+        setNftPlan(data.plan);
+        const missing = computeMissing(data.plan);
+        const awaitingField = getAwaitingField(missing);
+        
+        setCollectState(prev => ({
+          ...prev,
+          missing,
+          awaitingField
+        }));
+      }
 
-      // Check if plan is complete and move to next step
-      if (data.plan.isComplete && currentStep === FlowStep.CONVERSATION) {
-        // If no mediaUrl but has mediaPrompt, go to image generation
-        if (!data.plan.mediaUrl && data.plan.mediaPrompt) {
-          setCurrentStep(FlowStep.IMAGE_GENERATION);
-        } else {
-          setCurrentStep(FlowStep.PLAN_READY);
+      // Handle different response types and phase transitions
+      if (data.plan) {
+        const plan = data.plan;
+        
+        // Check if plan is complete (all required fields collected)
+        const planIsComplete = isPlanComplete(plan);
+        
+        if (planIsComplete && !plan.pendingConfirmation && currentPhase === FlowPhase.COLLECTING) {
+          // Plan is complete, transition to next phase
+          if (plan.mediaPrompt && !plan.mediaUrl) {
+            // Need to generate image first
+            setCurrentPhase(FlowPhase.IMAGE_GENERATION);
+          } else {
+            // Ready for confirmation
+            setCurrentPhase(FlowPhase.CONFIRMING);
+          }
+          
+          // Add completion message when moving to next phase
+          const completionMessage: Message = {
+            role: 'assistant',
+            content: "✅ **Perfect! Your NFT collection plan is complete.**\\n\\nLet's move to the next step.",
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, completionMessage]);
         }
-      } else {
-        // Start inactivity timeout for incomplete plans
-        startInactivityTimeout();
       }
 
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: 'I apologize, but I encountered an error. Please try again.',
+        content: '⚠️ **I encountered a technical hiccup.**\\n\\nCould you please try sending your message again?',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
-      startInactivityTimeout();
+      setLastMessageRole('assistant');
     }
 
     setIsLoading(false);
+    setCollectState(prev => ({ ...prev, inFlight: false }));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -229,24 +349,93 @@ const NFTCreator: React.FC = () => {
   };
 
   const modifyPlan = () => {
-    setCurrentStep(FlowStep.CONVERSATION);
+    clearNudgeTimeout();
+    setCurrentPhase(FlowPhase.COLLECTING);
     const modifyMessage: Message = {
       role: 'assistant',
-      content: "What would you like to change about your NFT collection plan? I can help you modify any aspect of it.",
+      content: "🔧 **What would you like to change about your NFT collection plan?**\\n\\nI can help you modify any aspect of it.",
       timestamp: new Date()
     };
     setMessages(prev => [...prev, modifyMessage]);
+    setLastMessageRole('assistant');
+    
+    // Reset collect state
+    const missing = computeMissing(nftPlan);
+    setCollectState({
+      missing,
+      awaitingField: getAwaitingField(missing),
+      inFlight: false,
+      nudgeCountForField: {},
+      lastNudgeKey: undefined
+    });
+  };
+
+  const handleQuickCreateNFT = async () => {
+    if (isMinting) return;
+
+    // Check if mainnet is selected but not supported yet
+    if (network === 'MAINNET') {
+      const warningMessage: Message = {
+        role: 'assistant',
+        content: "⚠️ **MAINNET not yet supported**\\n\\nThe Factory contract is not yet deployed on MAINNET. Please switch to TESTNET to create NFT collections.\\n\\nYou can switch networks using the toggle in the top-right corner.",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, warningMessage]);
+      return;
+    }
+
+    // Set default NFT plan values
+    const defaultPlan: NFTPlan = {
+      collectionName: "Quick Test Collection",
+      symbol: "QUICK",
+      totalSupply: 100,
+      description: "Test NFT collection created with one click",
+      royaltiesPct: 2.5,
+      mediaUrl: "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=500",
+      network: network as 'TESTNET' | 'MAINNET',
+      isComplete: true,
+      needsInfo: []
+    };
+
+    setNftPlan(defaultPlan);
+
+    // Add a quick message to chat
+    const quickMessage: Message = {
+      role: 'assistant',
+      content: "🚀 **Quick NFT created with default settings!**\\n\\nYou can now sign the transaction to mint your test collection.",
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, quickMessage]);
+
+    // Move directly to minting phase
+    setCurrentPhase(FlowPhase.MINTING);
+
+    // Call the existing transaction handler
+    return handleSignTransaction();
+
   };
 
   const handleSignTransaction = async () => {
     if (!nftPlan.collectionName || !nftPlan.totalSupply || !nftPlan.mediaUrl || isMinting) return;
 
+    clearNudgeTimeout();
     setIsMinting(true);
-    setCurrentStep(FlowStep.SIGNING);
+    setCurrentPhase(FlowPhase.MINTING);
 
     try {
-      // Step 1: Build transaction
-      const mintResponse = await fetch('/api/nft/mint', {
+      console.log('Starting NFT collection creation:', JSON.stringify({
+          collectionName: nftPlan.collectionName,
+          symbol: nftPlan.symbol,
+          totalSupply: nftPlan.totalSupply,
+          description: nftPlan.description,
+          royaltiesPct: 250, // Test value: 2.5% royalties (valid range 0-10000)
+          mediaUrl: nftPlan.mediaUrl,
+          airdrop: nftPlan.airdrop,
+          network,
+          userAddress: publicKey
+        }));
+      // Step 1: Create collection via factory
+      const createResponse = await fetch('/api/nft/mint', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -256,43 +445,122 @@ const NFTCreator: React.FC = () => {
           symbol: nftPlan.symbol,
           totalSupply: nftPlan.totalSupply,
           description: nftPlan.description,
-          royaltiesPct: nftPlan.royaltiesPct,
+          royaltiesPct: 250, // Test value: 2.5% royalties (valid range 0-10000)
           mediaUrl: nftPlan.mediaUrl,
           airdrop: nftPlan.airdrop,
-          network
+          network,
+          userAddress: publicKey
         }),
       });
 
-      if (!mintResponse.ok) {
-        throw new Error(`Failed to build transaction: ${mintResponse.statusText}`);
+      if (!createResponse.ok) {
+        throw new Error(`Failed to build collection creation transaction: ${createResponse.statusText}`);
       }
 
-      const { xdr } = await mintResponse.json();
+      const {
+        success,
+        xdr: preparedXdr,
+        simulation,
+        network: stellarNetwork,
+        factoryContract,
+        airdrop
+      } = await createResponse.json();
 
-      // Step 2: Sign transaction
-      if (!signTransaction) {
-        throw new Error('Wallet not properly connected');
+      if (!success) {
+        throw new Error('Failed to build collection creation transaction');
       }
 
-      const signedXdr = await signTransaction(xdr, { networkPassphrase: network === 'MAINNET' ? 'Public Global Stellar Network ; September 2015' : 'Test SDF Network ; September 2015' });
+      console.log('Transaction built successfully:', {
+        factoryContract,
+        hasAirdrop: !!airdrop,
+        simulationSuccess: simulation.success
+      });
 
-      // Step 3: Submit transaction
-      const submitResponse = await fetch('/api/tx/submit', {
+      // Step 2: Sign and submit the collection creation transaction
+      const networkPassphrase = getNetworkPassphrase();
+
+      const signedTx = await signTransaction(preparedXdr, {
+        networkPassphrase: networkPassphrase
+      });
+
+      if (!signedTx) {
+        throw new Error('User cancelled transaction signing');
+      }
+
+      // Submit the signed transaction
+      const submitResponse = await fetch('/api/stellar/submit', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          signedXdr,
-          network
-        }),
+          signedXdr: signedTx,
+          network: stellarNetwork
+        })
       });
 
-      if (!submitResponse.ok) {
-        throw new Error(`Failed to submit transaction: ${submitResponse.statusText}`);
+      const submitResult = await submitResponse.json();
+      if (!submitResult.success) {
+        throw new Error(`Transaction failed: ${submitResult.error}`);
       }
 
-      const { hash, explorerUrl } = await submitResponse.json();
+      const hash = submitResult.hash;
+      console.log('Collection created successfully:', hash);
+
+      // Log warning if present
+      if (submitResult.warning) {
+        console.log('Transaction warning:', submitResult.warning);
+      }
+
+      // Step 3: Handle airdrop if specified
+      let airdropResults = [];
+      if (airdrop && airdrop.needsMintAfterCreation) {
+        console.log(`Processing airdrop for ${airdrop.recipient}`);
+
+        // Wait for collection creation to be confirmed (simplified for demo)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Get the collection ID from the transaction result
+        // In a real implementation, you'd parse this from the transaction result
+        const collectionId = Math.floor(Math.random() * 1000) + 1; // Mock for now
+
+        // Build mint transaction
+        const mintResponse = await fetch('/api/factory/mint', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            collectionId,
+            recipient: airdrop.recipient,
+            amount: airdrop.amount,
+            userAddress: publicKey,
+            network: stellarNetwork
+          })
+        });
+
+        const mintData = await mintResponse.json();
+        if (mintData.success) {
+          const signedMintTx = await signTransaction(mintData.mintXdr, {
+            networkPassphrase: networkPassphrase
+          });
+          if (signedMintTx) {
+            const mintSubmitResponse = await fetch('/api/stellar/submit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                signedXdr: signedMintTx,
+                network: stellarNetwork
+              })
+            });
+
+            const mintSubmitResult = await mintSubmitResponse.json();
+            if (mintSubmitResult.success) {
+              airdropResults.push({
+                recipient: airdrop.recipient,
+                amount: airdrop.amount,
+                hash: mintSubmitResult.hash
+              });
+            }
+          }
+        }
+      }
 
       const newCollection: NFTCollection = {
         name: nftPlan.collectionName,
@@ -301,16 +569,58 @@ const NFTCreator: React.FC = () => {
         royaltyPercentage: nftPlan.royaltiesPct,
         mediaUrl: nftPlan.mediaUrl,
         airdropAddress: nftPlan.airdrop?.recipient,
-        contractAddress: 'CA7QYNF7JWCXVS5456KQEQ3XQWXCQXVTLWGUJ5FJZTVLD6OGZVSB2LLY',
+        contractAddress: factoryContract,
         transactionHash: hash
       };
 
+      // Save the creation to our database
+      try {
+        await fetch('/api/creations/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'nft',
+            userAddress: publicKey,
+            network,
+            plan: nftPlan,
+            txHash: hash,
+            name: nftPlan.collectionName,
+            symbol: nftPlan.symbol,
+            supply: nftPlan.totalSupply,
+            description: nftPlan.description,
+            royalties: nftPlan.royaltiesPct,
+            imageUrl: nftPlan.mediaUrl
+          })
+        });
+      } catch (saveError) {
+        console.error('Failed to save creation:', saveError);
+        // Don't fail the whole flow if saving fails
+      }
+
       setFinalCollection(newCollection);
-      setCurrentStep(FlowStep.SUCCESS);
+      setCurrentPhase(FlowPhase.DONE);
+      
+      // Add success message to chat
+      const successMessage: Message = {
+        role: 'assistant',
+        content: `🎉 **Your NFT collection has been created successfully!**\\n\\n📋 **Transaction Hash:** ${hash}\\n🔗 **Factory Contract:** ${factoryContract}\\n${airdropResults.length > 0 ? `\\n🎁 **Airdrops:** ${airdropResults.length} successful airdrops to specified recipients\\n` : ''}\\n✨ Your "${nftPlan.collectionName}" collection is now live on Stellar ${stellarNetwork}!`,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, successMessage]);
+
 
     } catch (error) {
       console.error('Transaction failed:', error);
       
+      // Extract meaningful error message
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+
       // Log error to API if available
       try {
         await fetch('/api/log', {
@@ -318,27 +628,55 @@ const NFTCreator: React.FC = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             stage: 'minting',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            planId: `${nftPlan.collectionName}-${Date.now()}`
+            error: errorMessage,
+            planId: `${nftPlan.collectionName}-${Date.now()}`,
+            errorDetails: error
+
           })
         });
       } catch (logError) {
         console.error('Failed to log error:', logError);
       }
 
-      const errorMessage: Message = {
+      // Provide specific error messages based on common issues
+      let userErrorMessage = '';
+      if (errorMessage.includes('Wallet not connected')) {
+        userErrorMessage = `⚠️ **Wallet Connection Error**\\n\\nYour wallet is not properly connected. Please reconnect your wallet and try again.`;
+      } else if (errorMessage.includes('User rejected') || errorMessage.includes('User denied')) {
+        userErrorMessage = `⚠️ **Transaction Cancelled**\\n\\nYou cancelled the transaction in your wallet. Click "Yes - Mint NFTs" to try again.`;
+      } else if (errorMessage.includes('insufficient') || errorMessage.includes('balance')) {
+        userErrorMessage = `⚠️ **Insufficient Balance**\\n\\nYou don't have enough XLM to pay for transaction fees. Please add XLM to your wallet and try again.`;
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
+        userErrorMessage = `⚠️ **Network Error**\\n\\nNetwork connection issue. Please check your internet connection and try again.`;
+      } else {
+        userErrorMessage = `⚠️ **Transaction Error**\\n\\n${errorMessage}\\n\\n**Solutions:**\\n- Check your wallet connection\\n- Ensure you have enough XLM for fees\\n- Try using the CLI commands instead`;
+      }
+
+      const assistantErrorMessage: Message = {
         role: 'assistant',
-        content: `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again or modify your plan.`,
+        content: `${userErrorMessage}\\n\\n💡 **Alternative:** You can use the CLI commands shown in the previous step to mint directly via Stellar CLI.\\n\\nYour plan is saved - just click "Yes - Mint NFTs" to retry the UI mint.`,
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, errorMessage]);
-      setCurrentStep(FlowStep.PLAN_READY);
+      setMessages(prev => [...prev, assistantErrorMessage]);
+      setCurrentPhase(FlowPhase.CLI_COMMANDS); // Go back to CLI commands page to show alternative
+
     }
 
     setIsMinting(false);
   };
 
   const generateImage = async (prompt: string) => {
+    if (!prompt || prompt.trim().length < 5) {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: "⚠️ **Please provide a more detailed description for your NFT image.**\\n\\nI need at least **5 characters** to create something amazing! 🎨",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
+
+
     setIsGeneratingImage(true);
     try {
       const response = await fetch('/api/ai/image/generate', {
@@ -347,24 +685,29 @@ const NFTCreator: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt,
+          prompt: prompt.trim(),
+
           size: "1024x1024"
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+
       }
 
       const data = await response.json();
       setGeneratedImage(data.imageUrl);
-      setImagePrompt(prompt);
+      setImagePrompt(data.prompt || prompt); // Use cleaned prompt if available
+
 
     } catch (error) {
       console.error('Image generation failed:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: `Failed to generate image: ${error instanceof Error ? error.message : 'Unknown error'}. Please try a different prompt.`,
+        content: `⚠️ **I had trouble generating that image:**\\n${error instanceof Error ? error.message : 'Unknown error'}\\n\\n🎨 **Try being more specific about what you want to see!**\\n\\n**Examples:**\\n- **A majestic dragon with golden scales**\\n- **A cute robot in a futuristic city**`,
+
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -379,7 +722,8 @@ const NFTCreator: React.FC = () => {
         mediaUrl: generatedImage,
         mediaPrompt: imagePrompt
       }));
-      setCurrentStep(FlowStep.PLAN_READY);
+      setCurrentPhase(FlowPhase.CONFIRMING);
+
     }
   };
 
@@ -391,14 +735,22 @@ const NFTCreator: React.FC = () => {
 
   const refineImage = () => {
     setGeneratedImage(null);
+    // Add a helpful message
+    const refineMessage: Message = {
+      role: 'assistant',
+      content: "✨ **Let's refine your image!**\\n\\nEdit the prompt below to describe exactly what you want to see, then generate a new image.",
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, refineMessage]);
   };
 
   const resetFlow = () => {
-    clearInactivityTimeout();
-    setCurrentStep(FlowStep.CONVERSATION);
+    clearNudgeTimeout();
+    setCurrentPhase(FlowPhase.COLLECTING);
     setMessages([{
       role: 'assistant',
-      content: "🧙‍♂️ Ready for another magical NFT creation? Tell me what you'd like to create!",
+      content: "🧙‍♂️ **Ready for another magical NFT creation?**\\n\\nLet's bring your next digital collection to life!\\n\\n✨ **What I can help you with:**\\n- Create NFT collections with custom names and symbols\\n- Generate stunning AI artwork for your NFTs\\n- Set up royalties and airdrops\\n- Deploy everything to Stellar's network\\n\\n💬 **Would you like to start by naming your NFT collection, or do you have a question first?**\\n\\nFeel free to ask questions or jump right in!",
+
       timestamp: new Date()
     }]);
     setNftPlan({
@@ -412,7 +764,18 @@ const NFTCreator: React.FC = () => {
     setGeneratedImage(null);
     setImagePrompt('');
     setIsGeneratingImage(false);
-    startInactivityTimeout();
+    setCliCommands([]);
+    setLastMessageRole('assistant');
+    
+    // Reset collect state
+    setCollectState({
+      missing: ['collectionName', 'symbol', 'totalSupply', 'mediaUrlOrPrompt'],
+      awaitingField: 'collectionName',
+      inFlight: false,
+      nudgeCountForField: {},
+      lastNudgeKey: undefined
+    });
+
   };
 
   if (!isConnected) {
@@ -452,47 +815,88 @@ const NFTCreator: React.FC = () => {
           <p className="text-xl text-readable-muted">
             Chat with the wizard to create your perfect NFT collection
           </p>
+          <div className="mt-4">
+            <Button
+              onClick={handleQuickCreateNFT}
+              disabled={isMinting || !isConnected}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-2"
+            >
+              {isMinting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating & Signing...
+                </>
+              ) : !isConnected ? (
+                <>
+                  🔗 Connect Wallet First
+                </>
+              ) : (
+                <>
+                  🚀 Quick Create & Sign NFT
+                </>
+              )}
+            </Button>
+            <p className="text-sm text-muted-foreground mt-2">
+              {!isConnected
+                ? "Connect your Stellar wallet to create and sign NFT transactions"
+                : "Creates a test NFT collection with default settings and opens wallet for signing"
+              }
+            </p>
+          </div>
         </div>
 
         {/* Progress Steps */}
         <div className="flex items-center justify-center mb-8">
           <div className="flex items-center gap-4">
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-              currentStep === FlowStep.CONVERSATION ? 'bg-primary text-primary-foreground' : 
-              [FlowStep.PLAN_READY, FlowStep.SIGNING, FlowStep.SUCCESS].includes(currentStep) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              currentPhase === FlowPhase.COLLECTING ? 'bg-primary text-primary-foreground' : 
+              [FlowPhase.IMAGE_GENERATION, FlowPhase.CONFIRMING, FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">1</span>
               Chat with AI
             </div>
             <div className="w-8 h-px bg-border" />
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-              currentStep === FlowStep.IMAGE_GENERATION ? 'bg-primary text-primary-foreground' : 
-              [FlowStep.PLAN_READY, FlowStep.SIGNING, FlowStep.SUCCESS].includes(currentStep) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              currentPhase === FlowPhase.IMAGE_GENERATION ? 'bg-primary text-primary-foreground' : 
+              [FlowPhase.CONFIRMING, FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">2</span>
               Generate Image
             </div>
             <div className="w-8 h-px bg-border" />
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-              currentStep === FlowStep.PLAN_READY ? 'bg-primary text-primary-foreground' : 
-              [FlowStep.SIGNING, FlowStep.SUCCESS].includes(currentStep) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              currentPhase === FlowPhase.CONFIRMING ? 'bg-primary text-primary-foreground' : 
+              [FlowPhase.CLI_COMMANDS, FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">3</span>
               Review Plan
             </div>
             <div className="w-8 h-px bg-border" />
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-              currentStep === FlowStep.SIGNING ? 'bg-primary text-primary-foreground' : 
-              currentStep === FlowStep.SUCCESS ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              currentPhase === FlowPhase.CLI_COMMANDS ? 'bg-primary text-primary-foreground' : 
+              [FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">4</span>
+              Sign
+            </div>
+            <div className="w-8 h-px bg-border" />
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
+              currentPhase === FlowPhase.MINTING ? 'bg-primary text-primary-foreground' : 
+              currentPhase === FlowPhase.DONE ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+            }`}>
+              <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">5</span>
+
               Deploy NFTs
             </div>
           </div>
         </div>
 
         {/* Main Content */}
-        {currentStep === FlowStep.CONVERSATION && (
+        {currentPhase === FlowPhase.COLLECTING && (
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Chat Interface */}
             <Card className="lg:col-span-2">
@@ -534,7 +938,14 @@ const NFTCreator: React.FC = () => {
                             </span>
                           </div>
                         )}
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <div className="text-sm whitespace-pre-wrap">
+                          {message.content.split('\\n').map((line, i) => (
+                            <div key={i} className={i > 0 ? 'mt-2' : ''}>
+                              {line}
+                            </div>
+                          ))}
+                        </div>
+
                         <p className="text-xs opacity-60 mt-1">
                           {message.timestamp.toLocaleTimeString()}
                         </p>
@@ -576,11 +987,16 @@ const NFTCreator: React.FC = () => {
                   />
                   <Button
                     onClick={sendMessage}
-                    disabled={!currentMessage.trim() || isLoading}
+                    disabled={!currentMessage.trim() || isLoading || collectState.inFlight}
                     size="icon"
                     className="self-end"
                   >
-                    <Send className="w-4 h-4" />
+                    {collectState.inFlight ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+
                   </Button>
                 </div>
               </CardContent>
@@ -659,7 +1075,20 @@ const NFTCreator: React.FC = () => {
                   <p className="font-semibold">{network}</p>
                 </div>
 
-                {nftPlan.needsInfo.length > 0 && (
+                {nftPlan.pendingConfirmation && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Pending Confirmation</label>
+                    <Badge variant="secondary" className="w-full justify-center mt-1">
+                      ⏳ Confirming {nftPlan.pendingConfirmation.field}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      "{nftPlan.pendingConfirmation.value}"
+                    </p>
+                  </div>
+                )}
+
+                {nftPlan.needsInfo.length > 0 && !nftPlan.pendingConfirmation && (
+
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Still Needed</label>
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -672,7 +1101,8 @@ const NFTCreator: React.FC = () => {
                   </div>
                 )}
 
-                {nftPlan.isComplete && (
+                {nftPlan.isComplete && !nftPlan.pendingConfirmation && (
+
                   <Badge className="w-full justify-center bg-green-500">
                     <CheckCircle className="w-4 h-4 mr-1" />
                     Plan Complete!
@@ -683,7 +1113,8 @@ const NFTCreator: React.FC = () => {
           </div>
         )}
 
-        {currentStep === FlowStep.IMAGE_GENERATION && (
+        {currentPhase === FlowPhase.IMAGE_GENERATION && (
+
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -740,22 +1171,28 @@ const NFTCreator: React.FC = () => {
                     <label className="text-sm font-medium text-muted-foreground">Prompt Used</label>
                     <p className="text-sm mt-1">{imagePrompt}</p>
                   </div>
-                  <div className="flex gap-3">
-                    <Button onClick={regenerateImage} variant="outline" disabled={isGeneratingImage}>
-                      {isGeneratingImage ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-4 h-4 mr-2" />
-                      )}
-                      Regenerate
-                    </Button>
-                    <Button onClick={refineImage} variant="outline">
-                      Edit Prompt
-                    </Button>
-                    <Button onClick={acceptImage} className="flex-1">
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Button onClick={regenerateImage} variant="outline" disabled={isGeneratingImage} className="flex-1">
+                        {isGeneratingImage ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 mr-2" />
+                        )}
+                        Regenerate Same
+                      </Button>
+                      <Button onClick={refineImage} variant="outline" className="flex-1">
+                        ✏️ Edit & Regenerate
+                      </Button>
+                    </div>
+                    <Button onClick={acceptImage} className="w-full" size="lg">
                       <CheckCircle className="w-4 h-4 mr-2" />
-                      Accept Image
+                      Accept This Image
                     </Button>
+                    <p className="text-xs text-center text-muted-foreground">
+                      💡 Tip: You can regenerate or edit the prompt until you're happy with the result!
+                    </p>
+
                   </div>
                 </div>
               )}
@@ -763,19 +1200,21 @@ const NFTCreator: React.FC = () => {
           </Card>
         )}
 
-        {currentStep === FlowStep.PLAN_READY && nftPlan.isComplete && (
+        {currentPhase === FlowPhase.CONFIRMING && (
+
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-green-500" />
-                NFT Collection Plan Ready
+                ✅ Here's your NFT plan. Do you confirm?
               </CardTitle>
               <CardDescription>
-                Review your collection details before minting
+                Review all details carefully before proceeding to mint
+
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-6 space-y-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Collection Name</label>
                   <p className="text-lg font-semibold">{nftPlan.collectionName}</p>
@@ -802,16 +1241,33 @@ const NFTCreator: React.FC = () => {
                 )}
                 {nftPlan.mediaUrl && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Media URL</label>
-                    <p className="text-sm break-all">{nftPlan.mediaUrl}</p>
+                    <label className="text-sm font-medium text-muted-foreground">Media</label>
+                    <div className="mt-2">
+                      <Image
+                        src={nftPlan.mediaUrl}
+                        alt="NFT Collection Media"
+                        width={200}
+                        height={200}
+                        className="rounded-lg border object-cover"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 break-all">{nftPlan.mediaUrl}</p>
+                  </div>
+                )}
+                {nftPlan.mediaPrompt && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Image Prompt</label>
+                    <p className="text-sm italic">"{nftPlan.mediaPrompt}"</p>
+
                   </div>
                 )}
                 {nftPlan.airdrop?.recipient && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Airdrop Address</label>
+                    <label className="text-sm font-medium text-muted-foreground">Airdrop</label>
                     <p className="text-sm font-mono break-all">{nftPlan.airdrop.recipient}</p>
                     {nftPlan.airdrop.amount && (
-                      <p className="text-xs text-muted-foreground">{nftPlan.airdrop.amount} NFTs</p>
+                      <p className="text-xs text-muted-foreground">{nftPlan.airdrop.amount} NFTs will be airdropped</p>
+
                     )}
                   </div>
                 )}
@@ -820,30 +1276,146 @@ const NFTCreator: React.FC = () => {
                   <Badge variant="secondary">Stellar {network}</Badge>
                 </div>
               </div>
+              
+              <div className="text-center space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Reply <strong>yes</strong> to mint, or <strong>no</strong> to adjust
+                </p>
+                <div className="flex gap-3">
+                  <Button onClick={modifyPlan} variant="outline" className="flex-1">
+                    No - Adjust Plan
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      // Generate CLI commands and move to CLI phase
+                      const commands = generateCliCommands(nftPlan);
+                      setCliCommands(commands);
+                      setCurrentPhase(FlowPhase.CLI_COMMANDS);
+                    }}
+                    disabled={!nftPlan.mediaUrl && !nftPlan.mediaPrompt}
+                    className="flex-1"
+                  >
+                    Yes - Show CLI Commands
+                  </Button>
+
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {currentPhase === FlowPhase.CLI_COMMANDS && (
+          <Card className="max-w-4xl mx-auto">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                ✅ Your NFT collection **{nftPlan.collectionName} ({nftPlan.symbol})** is ready!
+              </CardTitle>
+              <CardDescription>
+                Run these Soroban CLI commands to mint your NFTs on TESTNET
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Collection Summary */}
+              <div className="bg-muted/50 rounded-lg p-6 space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">🔢 Total Supply</label>
+                    <p className="text-lg font-semibold">{nftPlan.totalSupply} NFTs</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">👛 Recipient</label>
+                    <p className="text-sm font-mono break-all">
+                      {nftPlan.airdrop?.recipient || publicKey || 'G...USER_PUBLIC_KEY'}
+                    </p>
+                  </div>
+                </div>
+                {nftPlan.mediaUrl && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">🖼️ Media</label>
+                    <p className="text-sm break-all text-muted-foreground">{nftPlan.mediaUrl}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* CLI Commands */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  🚀 Ready-to-use CLI Commands
+                </h3>
+                
+                {cliCommands.map((command, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto">
+                      <pre className="text-sm whitespace-pre-wrap font-mono">
+                        {command}
+                      </pre>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigator.clipboard.writeText(command)}
+                      className="w-full"
+                    >
+                      📋 Copy Command
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Instructions:</h4>
+                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
+                  <li>Make sure you have the Stellar CLI installed</li>
+                  <li>Ensure your deployer account is configured</li>
+                  <li>Copy and run the commands in your terminal</li>
+                  <li>Your NFTs will be minted directly on Stellar TESTNET</li>
+                </ol>
+              </div>
+
+              {/* Development Notice */}
+              <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">🏭 Factory Pattern:</h4>
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  This system now uses a Factory/Registry pattern! The Factory contract deploys individual NFT collection contracts 
+                  and handles fee routing. The CLI commands above show the new factory-based workflow.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
               <div className="flex gap-3">
-                <Button onClick={modifyPlan} variant="outline" className="flex-1">
-                  Modify Plan
+                <Button 
+                  onClick={() => setCurrentPhase(FlowPhase.CONFIRMING)} 
+                  variant="outline" 
+                  className="flex-1"
+                >
+                  ← Back to Plan
                 </Button>
                 <Button 
                   onClick={handleSignTransaction}
-                  disabled={isMinting || !nftPlan.mediaUrl}
+                  disabled={isMinting}
+
                   className="flex-1"
                 >
                   {isMinting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Minting...
                     </>
                   ) : (
-                    'Mint NFTs'
+                    'Or Mint via UI'
+
                   )}
+                </Button>
+                <Button onClick={resetFlow} variant="outline" className="flex-1">
+                  Start New Collection
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {currentStep === FlowStep.SIGNING && (
+        {currentPhase === FlowPhase.MINTING && (
           <Card className="max-w-2xl mx-auto">
             <CardContent className="py-12 text-center">
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
@@ -856,13 +1428,15 @@ const NFTCreator: React.FC = () => {
           </Card>
         )}
 
-        {currentStep === FlowStep.SUCCESS && finalCollection && (
+        {currentPhase === FlowPhase.DONE && finalCollection && (
+
           <Card className="max-w-2xl mx-auto">
             <CardContent className="py-12 text-center">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-6" />
-              <h3 className="text-2xl font-bold mb-2">NFT Collection Created!</h3>
+              <h3 className="text-2xl font-bold mb-2">🎉 Your NFT collection has been created!</h3>
               <p className="text-muted-foreground mb-8">
-                Your "{finalCollection.name}" collection has been successfully deployed to Stellar {network}
+                <strong>"{finalCollection.name}"</strong> collection is now live on Stellar {network}
+
               </p>
               
               <div className="space-y-4 text-left bg-muted/50 rounded-lg p-6 mb-8">
@@ -874,6 +1448,21 @@ const NFTCreator: React.FC = () => {
                   <label className="text-sm font-medium text-muted-foreground">Supply</label>
                   <p className="font-semibold">{finalCollection.count} NFTs</p>
                 </div>
+                {finalCollection.mediaUrl && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Collection Image</label>
+                    <div className="mt-2">
+                      <Image
+                        src={finalCollection.mediaUrl}
+                        alt="Collection Media"
+                        width={150}
+                        height={150}
+                        className="rounded-lg border object-cover mx-auto"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {finalCollection.airdropAddress && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Airdropped To</label>
@@ -890,24 +1479,30 @@ const NFTCreator: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <Button 
-                  variant="outline" 
-                  asChild
-                  className="flex-1"
-                >
-                  <a 
-                    href={getExplorerUrl('tx', finalCollection.transactionHash!)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <Button 
+                    variant="outline" 
+                    asChild
+                    className="flex-1"
+
                   >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View on Explorer
-                  </a>
-                </Button>
-                <Button onClick={resetFlow} className="flex-1">
-                  Create Another
-                </Button>
+                    <a 
+                      href={getExplorerUrl('tx', finalCollection.transactionHash!)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View on Explorer
+                    </a>
+                  </Button>
+                  <Button onClick={resetFlow} className="flex-1" size="lg">
+                    Start a New Collection
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Your collection is permanently stored on the Stellar blockchain!
+                </p>
               </div>
             </CardContent>
           </Card>

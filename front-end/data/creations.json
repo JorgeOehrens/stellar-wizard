@@ -1,0 +1,123 @@
+[
+  {
+    "id": "nft_1757983706936_e7yc4dsst",
+    "type": "nft",
+    "userAddress": "GAK6GKLX5M7F5WQMZOJ3VZCHIFKEANY4CP2LHPLGF3NYUS7IX3QPSOUY",
+    "network": "TESTNET",
+    "plan": {
+      "network": "TESTNET",
+      "isComplete": true,
+      "needsInfo": [],
+      "collectionName": "HACKATHON MERIDIAN",
+      "symbol": "HEOER",
+      "totalSupply": 200,
+      "mediaPrompt": "Nature with animals in a digital art style",
+      "mediaUrl": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-eEIioyTM4GW7FkVuYW3SCDvh/user-ndmTcw3a6oWXCohyeMejRcTS/img-6ltpSWyCWB2BszizrNCmLKm4.png?st=2025-09-15T23%3A48%3A16Z&se=2025-09-16T01%3A48%3A16Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=b1a0ae1f-618f-4548-84fd-8b16cacd5485&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-15T20%3A50%3A30Z&ske=2025-09-16T20%3A50%3A30Z&sks=b&skv=2024-08-04&sig=dFmouNTYe6l6MoUZ7PInwui1R2I5WrVBTGEy8gAS8HE%3D"
+    },
+    "txHash": "mock_tx_1757983706481_8z8toyfp4",
+    "createdAt": "2025-09-16T00:48:26.936Z",
+    "name": "HACKATHON MERIDIAN",
+    "symbol": "HEOER",
+    "supply": 200,
+    "imageUrl": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-eEIioyTM4GW7FkVuYW3SCDvh/user-ndmTcw3a6oWXCohyeMejRcTS/img-6ltpSWyCWB2BszizrNCmLKm4.png?st=2025-09-15T23%3A48%3A16Z&se=2025-09-16T01%3A48%3A16Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=b1a0ae1f-618f-4548-84fd-8b16cacd5485&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-15T20%3A50%3A30Z&ske=2025-09-16T20%3A50%3A30Z&sks=b&skv=2024-08-04&sig=dFmouNTYe6l6MoUZ7PInwui1R2I5WrVBTGEy8gAS8HE%3D"
+  },
+  {
+    "id": "nft_1757991769875_vad8643in",
+    "type": "nft",
+    "userAddress": "GAK6GKLX5M7F5WQMZOJ3VZCHIFKEANY4CP2LHPLGF3NYUS7IX3QPSOUY",
+    "network": "TESTNET",
+    "plan": {
+      "collectionName": "Quick Test Collection",
+      "symbol": "QUICK",
+      "totalSupply": 100,
+      "description": "Test NFT collection created with one click",
+      "royaltiesPct": 2.5,
+      "mediaUrl": "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=500",
+      "network": "TESTNET",
+      "isComplete": true,
+      "needsInfo": []
+    },
+    "txHash": "25a35d90eb376420c1cea72541e26d7b6cafe0306bd6466f66c5610c78afb439",
+    "createdAt": "2025-09-16T03:02:49.875Z",
+    "name": "Quick Test Collection",
+    "symbol": "QUICK",
+    "supply": 100,
+    "description": "Test NFT collection created with one click",
+    "royalties": 2.5,
+    "imageUrl": "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=500"
+  },
+  {
+    "id": "nft_1757991809552_gs7216p5y",
+    "type": "nft",
+    "userAddress": "GAK6GKLX5M7F5WQMZOJ3VZCHIFKEANY4CP2LHPLGF3NYUS7IX3QPSOUY",
+    "network": "TESTNET",
+    "plan": {
+      "collectionName": "Quick Test Collection",
+      "symbol": "QUICK",
+      "totalSupply": 100,
+      "description": "Test NFT collection created with one click",
+      "royaltiesPct": 2.5,
+      "mediaUrl": "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=500",
+      "network": "TESTNET",
+      "isComplete": true,
+      "needsInfo": []
+    },
+    "txHash": "79ec16170d747539d71028f299ddccbb981a0fecaa89ad4a237bf484e5f7f41e",
+    "createdAt": "2025-09-16T03:03:29.552Z",
+    "name": "Quick Test Collection",
+    "symbol": "QUICK",
+    "supply": 100,
+    "description": "Test NFT collection created with one click",
+    "royalties": 2.5,
+    "imageUrl": "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=500"
+  },
+  {
+    "id": "nft_1757992519438_0hblraj9v",
+    "type": "nft",
+    "userAddress": "GAK6GKLX5M7F5WQMZOJ3VZCHIFKEANY4CP2LHPLGF3NYUS7IX3QPSOUY",
+    "network": "TESTNET",
+    "plan": {
+      "collectionName": "Quick Test Collection",
+      "symbol": "QUICK",
+      "totalSupply": 100,
+      "description": "Test NFT collection created with one click",
+      "royaltiesPct": 2.5,
+      "mediaUrl": "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=500",
+      "network": "TESTNET",
+      "isComplete": true,
+      "needsInfo": []
+    },
+    "txHash": "38f2558b5c1222cd89d53c15ce1e615f0c40f4c09ee90f90f0927aad868b20e1",
+    "createdAt": "2025-09-16T03:15:19.438Z",
+    "name": "Quick Test Collection",
+    "symbol": "QUICK",
+    "supply": 100,
+    "description": "Test NFT collection created with one click",
+    "royalties": 2.5,
+    "imageUrl": "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=500"
+  },
+  {
+    "id": "nft_1757993870978_r6m3je6fu",
+    "type": "nft",
+    "userAddress": "GAK6GKLX5M7F5WQMZOJ3VZCHIFKEANY4CP2LHPLGF3NYUS7IX3QPSOUY",
+    "network": "TESTNET",
+    "plan": {
+      "network": "TESTNET",
+      "isComplete": true,
+      "needsInfo": [],
+      "collectionName": "HACKOER",
+      "symbol": "HAKD",
+      "totalSupply": 200,
+      "mediaPrompt": "3 hacks men in the Copacabana Palace",
+      "royaltiesPct": 2,
+      "mediaUrl": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-eEIioyTM4GW7FkVuYW3SCDvh/user-ndmTcw3a6oWXCohyeMejRcTS/img-3nx8V9rHcXr7hZhiy4pmEl1v.png?st=2025-09-16T02%3A37%3A31Z&se=2025-09-16T04%3A37%3A31Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=cc612491-d948-4d2e-9821-2683df3719f5&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-15T22%3A21%3A03Z&ske=2025-09-16T22%3A21%3A03Z&sks=b&skv=2024-08-04&sig=/d8z/OTJYoDYGJhCPkYbjC1EPwni0VMX9UU/Z0T9dds%3D"
+    },
+    "txHash": "ba36fda39678064749a9771d5a73968fb866af810b45fd417310c7fb49e29983",
+    "createdAt": "2025-09-16T03:37:50.978Z",
+    "name": "HACKOER",
+    "symbol": "HAKD",
+    "supply": 200,
+    "royalties": 2,
+    "imageUrl": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-eEIioyTM4GW7FkVuYW3SCDvh/user-ndmTcw3a6oWXCohyeMejRcTS/img-3nx8V9rHcXr7hZhiy4pmEl1v.png?st=2025-09-16T02%3A37%3A31Z&se=2025-09-16T04%3A37%3A31Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=cc612491-d948-4d2e-9821-2683df3719f5&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-15T22%3A21%3A03Z&ske=2025-09-16T22%3A21%3A03Z&sks=b&skv=2024-08-04&sig=/d8z/OTJYoDYGJhCPkYbjC1EPwni0VMX9UU/Z0T9dds%3D"
+  }
+]

@@ -1,0 +1,19 @@
+# Environment files containing secrets
+.env
+.env.local
+
+# Build artifacts
+target/
+Cargo.lock
+
+# IDE files
+.vscode/
+.idea/
+
+node_modules/
+# OS files
+.DS_Store
+Thumbs.db
+
+# Soroban CLI artifacts
+.soroban/

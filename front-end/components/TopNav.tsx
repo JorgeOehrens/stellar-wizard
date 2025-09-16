@@ -1,23 +1,40 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useWallet } from '../app/providers/WalletProvider';
 import { useNetwork } from '../app/providers/NetworkProvider';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import StellarWizardLogo from './StellarWizardLogo';
 import ThemeToggle from './ThemeToggle';
 import NetworkToggle from './ui/NetworkToggle';
+import WalletAuthModal from './WalletAuthModal';
+import { Copy, Check } from 'lucide-react';
 
 const TopNav: React.FC = () => {
-  const { publicKey, connect, disconnect, isConnected } = useWallet();
+  const { publicKey, authMethod, disconnect, isConnected } = useWallet();
   const { network } = useNetwork();
   const pathname = usePathname();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const shortenPublicKey = (key: string): string => {
     if (key.length <= 10) return key;
     return `${key.slice(0, 4)}…${key.slice(-6)}`;
+  };
+
+  const copyAddress = async () => {
+    if (publicKey) {
+      try {
+        await navigator.clipboard.writeText(publicKey);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy address:', err);
+      }
+    }
   };
 
   const navLinks = [
@@ -74,6 +91,22 @@ const TopNav: React.FC = () => {
                 <span className="text-xs font-mono text-white">
                   {shortenPublicKey(publicKey!)}
                 </span>
+                <button
+                  onClick={copyAddress}
+                  className="ml-1 p-1 hover:bg-white/10 rounded transition-colors"
+                  title={copied ? 'Copied!' : 'Copy wallet address'}
+                >
+                  {copied ? (
+                    <Check className="h-3 w-3 text-green-400" />
+                  ) : (
+                    <Copy className="h-3 w-3 text-white/70 hover:text-white" />
+                  )}
+                </button>
+                {authMethod && (
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {authMethod === 'google' ? 'Google' : 'Kit'}
+                  </Badge>
+                )}
               </div>
               <Button
                 variant="outline"
@@ -87,7 +120,7 @@ const TopNav: React.FC = () => {
           ) : (
             <Button
               size="sm"
-              onClick={connect}
+              onClick={() => setShowAuthModal(true)}
               className="h-8 text-xs bg-hk-yellow text-black font-semibold hover:bg-hk-yellow/90"
             >
               Connect Wallet
@@ -95,6 +128,11 @@ const TopNav: React.FC = () => {
           )}
         </div>
       </div>
+
+      <WalletAuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </nav>
   );
 };

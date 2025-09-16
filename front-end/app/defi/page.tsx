@@ -5,6 +5,7 @@ import { Card, CardContent } from "../../components/ui/card"
 import { Clock, Zap, TrendingUp, Shield, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
+
 export default function DeFiPage() {
   return (
     <div className="min-h-screen bg-overlay-light dark:bg-overlay">
@@ -125,6 +126,7 @@ export default function DeFiPage() {
           </div>
 
         </div>
+
       </div>
     </div>
   );

@@ -4,7 +4,23 @@ import { useState, forwardRef, useImperativeHandle, useRef } from "react"
 import { Pencil, RefreshCw, Check, X, Square } from "lucide-react"
 import Message from "./Message"
 import Composer from "./Composer"
+import MarkdownRenderer, { useMarkdownMessage } from "./ui/markdown-renderer"
 import { cls, timeAgo } from "./utils"
+
+function MessageContent({ content, role }) {
+  const processedContent = useMarkdownMessage(content)
+
+  if (role === "assistant") {
+    return (
+      <MarkdownRenderer
+        content={processedContent}
+        className="prose-sm max-w-none dark:prose-invert"
+      />
+    )
+  }
+
+  return <div className="whitespace-pre-wrap">{content}</div>
+}
 
 function ThinkingMessage({ onPause }) {
   return (
@@ -132,7 +148,7 @@ const ChatPane = forwardRef(function ChatPane(
                   </div>
                 ) : (
                   <Message role={m.role}>
-                    <div className="whitespace-pre-wrap">{m.content}</div>
+                    <MessageContent content={m.content} role={m.role} />
                     {m.role === "user" && (
                       <div className="mt-1 flex gap-2 text-[11px] text-zinc-500">
                         <button className="inline-flex items-center gap-1 hover:underline" onClick={() => startEdit(m)}>

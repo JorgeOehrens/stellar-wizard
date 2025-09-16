@@ -61,13 +61,33 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     sdk.initialize().catch(console.error);
     setSocialSDK(sdk);
 
-    // Check if already connected on mount
+    // Check if already connected on mount and attempt reconnection
     const storedData = localStorage.getItem('stellar_wallet_data');
     if (storedData) {
       try {
         const { publicKey: storedKey, authMethod: storedMethod } = JSON.parse(storedData);
-        setPublicKey(storedKey);
-        setAuthMethod(storedMethod);
+
+        if (storedMethod === 'kit' && walletKit) {
+          // For Freighter wallet, attempt to reconnect
+          walletKit.getAddress()
+            .then(({ address }) => {
+              if (address === storedKey) {
+                setPublicKey(storedKey);
+                setAuthMethod(storedMethod);
+              } else {
+                // Address mismatch, clear stored data
+                localStorage.removeItem('stellar_wallet_data');
+              }
+            })
+            .catch(() => {
+              // Connection failed, clear stored data
+              localStorage.removeItem('stellar_wallet_data');
+            });
+        } else if (storedMethod === 'google') {
+          // For Google auth, we can restore from stored data
+          setPublicKey(storedKey);
+          setAuthMethod(storedMethod);
+        }
       } catch (error) {
         console.error('Failed to parse stored wallet data:', error);
         localStorage.removeItem('stellar_wallet_data');

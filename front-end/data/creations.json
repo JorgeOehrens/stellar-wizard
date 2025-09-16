@@ -178,6 +178,75 @@
     "supply": 1000,
     "royalties": 1,
     "imageUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/variants/variant-pixel-art-1758006918481-8qwo8i.png"
-
+  },
+  {
+    "id": "nft_1758013763469_p3dlvt3k6",
+    "type": "nft",
+    "userAddress": "GAK6GKLX5M7F5WQMZOJ3VZCHIFKEANY4CP2LHPLGF3NYUS7IX3QPSOUY",
+    "network": "TESTNET",
+    "plan": {
+      "network": "TESTNET",
+      "isComplete": false,
+      "needsInfo": [
+        "mediaUrl"
+      ],
+      "collectionName": "Hackathon Meridian",
+      "symbol": "HACKE",
+      "totalSupply": 1000,
+      "royaltiesPct": 1,
+      "mediaUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/variants/variant-pixel-art-1758013686065-uv6g07.png",
+      "originalUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/original-622f41fd234a9f23-1758013619822.jpg",
+      "originalSha256": "622f41fd234a9f23bcd02bd93b5d2d870b1688c04e88760989048d9a2f649c27",
+      "editParams": {
+        "preset": "pixel-art",
+        "intensity": 0.7,
+        "options": {
+          "variantCount": 1
+        }
+      },
+      "iterations": 2
+    },
+    "txHash": "e64a4fad36d551c44359fe52cecde86df185a6c9101025669112bb95aabe912c",
+    "createdAt": "2025-09-16T09:09:23.469Z",
+    "name": "Hackathon Meridian",
+    "symbol": "HACKE",
+    "supply": 1000,
+    "royalties": 1,
+    "imageUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/variants/variant-pixel-art-1758013686065-uv6g07.png"
+  },
+  {
+    "id": "nft_1758014061533_aw7ujfblm",
+    "type": "nft",
+    "userAddress": "GAS522CRS76JWJPI5GJSUMKQ4DD6MWWA6SGVBPZTWMH3WQ7T523LTQWI",
+    "network": "TESTNET",
+    "plan": {
+      "network": "TESTNET",
+      "isComplete": false,
+      "needsInfo": [
+        "mediaUrl"
+      ],
+      "collectionName": "HackathonDev",
+      "symbol": "HAKC3",
+      "totalSupply": 1000,
+      "royaltiesPct": 1,
+      "mediaUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/variants/variant-pixel-art-1758014002558-noinc2.png",
+      "originalUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/original-622f41fd234a9f23-1758013996512.jpg",
+      "originalSha256": "622f41fd234a9f23bcd02bd93b5d2d870b1688c04e88760989048d9a2f649c27",
+      "editParams": {
+        "preset": "pixel-art",
+        "intensity": 0.7,
+        "options": {
+          "variantCount": 1
+        }
+      },
+      "iterations": 1
+    },
+    "txHash": "4ee498a8e558827ac021ac03076ae4aa72669c87a601560aaa5977afb54e84d9",
+    "createdAt": "2025-09-16T09:14:21.533Z",
+    "name": "HackathonDev",
+    "symbol": "HAKC3",
+    "supply": 1000,
+    "royalties": 1,
+    "imageUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/variants/variant-pixel-art-1758014002558-noinc2.png"
   }
 ]

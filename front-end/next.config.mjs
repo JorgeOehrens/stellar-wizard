@@ -50,6 +50,31 @@ const nextConfig = {
       topLevelAwait: true,
     };
 
+    // Suppress critical dependency warnings
+    const originalWarningsFilter = config.stats?.warningsFilter || [];
+    config.stats = {
+      ...config.stats,
+      warningsFilter: [
+        ...originalWarningsFilter,
+        // Ignore critical dependency warnings from require-addon
+        (warning) => {
+          return warning.includes('Critical dependency') &&
+                 warning.includes('require-addon');
+        }
+      ]
+    };
+
+    // Alternative approach: ignore warnings at module level
+    config.module = config.module || {};
+    config.module.rules = config.module.rules || [];
+    config.module.rules.push({
+      test: /node_modules\/require-addon\/.*\.js$/,
+      parser: {
+        amd: false,
+        commonjs: false,
+      },
+    });
+
     return config;
   },
 }

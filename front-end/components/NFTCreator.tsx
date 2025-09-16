@@ -1168,42 +1168,7 @@ stellar contract invoke \\
                 )}
               </div>
 
-              {/* CLI Commands */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  🚀 Ready-to-use CLI Commands
-                </h3>
-                
-                {cliCommands.map((command, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto">
-                      <pre className="text-sm whitespace-pre-wrap font-mono">
-                        {command}
-                      </pre>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigator.clipboard.writeText(command)}
-                      className="w-full"
-                    >
-                      📋 Copy Command
-                    </Button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Instructions */}
-              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Instructions:</h4>
-                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
-                  <li>Make sure you have the Stellar CLI installed</li>
-                  <li>Ensure your deployer account is configured</li>
-                  <li>Copy and run the commands in your terminal</li>
-                  <li>Your NFTs will be minted directly on Stellar TESTNET</li>
-                </ol>
-              </div>
-
+      
               {/* Development Notice */}
               <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                 <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">🏭 Factory Pattern:</h4>

@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "node -r ./suppress-warnings.js ./node_modules/.bin/next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "node -r ./suppress-warnings.js ./node_modules/.bin/next start"
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^1.9.5",

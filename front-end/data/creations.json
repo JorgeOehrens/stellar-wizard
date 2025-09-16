@@ -119,5 +119,65 @@
     "supply": 200,
     "royalties": 2,
     "imageUrl": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-eEIioyTM4GW7FkVuYW3SCDvh/user-ndmTcw3a6oWXCohyeMejRcTS/img-3nx8V9rHcXr7hZhiy4pmEl1v.png?st=2025-09-16T02%3A37%3A31Z&se=2025-09-16T04%3A37%3A31Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=cc612491-d948-4d2e-9821-2683df3719f5&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-15T22%3A21%3A03Z&ske=2025-09-16T22%3A21%3A03Z&sks=b&skv=2024-08-04&sig=/d8z/OTJYoDYGJhCPkYbjC1EPwni0VMX9UU/Z0T9dds%3D"
+  },
+  {
+    "id": "nft_1757996433480_n7h8jxiyb",
+    "type": "nft",
+    "userAddress": "GAK6GKLX5M7F5WQMZOJ3VZCHIFKEANY4CP2LHPLGF3NYUS7IX3QPSOUY",
+    "network": "TESTNET",
+    "plan": {
+      "network": "TESTNET",
+      "isComplete": true,
+      "needsInfo": [],
+      "collectionName": "hackathon",
+      "symbol": "JIDPE",
+      "totalSupply": 300,
+      "mediaPrompt": "A futuristic hacker in a neon-lit city",
+      "royaltiesPct": 3,
+      "mediaUrl": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-eEIioyTM4GW7FkVuYW3SCDvh/user-ndmTcw3a6oWXCohyeMejRcTS/img-KGtNXlw87C887C217P0YBy6K.png?st=2025-09-16T03%3A19%3A50Z&se=2025-09-16T05%3A19%3A50Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=cc612491-d948-4d2e-9821-2683df3719f5&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-15T16%3A01%3A39Z&ske=2025-09-16T16%3A01%3A39Z&sks=b&skv=2024-08-04&sig=Lvv1nGBNUm6xPnKm0FwXvwXkcjq9YXYe%2Bya93wNFwao%3D"
+    },
+    "txHash": "e0deab091c94ee16715dd24a5277ea4afa6c1cd82d6b7cd91d975beeaab0725f",
+    "createdAt": "2025-09-16T04:20:33.480Z",
+    "name": "hackathon",
+    "symbol": "JIDPE",
+    "supply": 300,
+    "royalties": 3,
+    "imageUrl": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-eEIioyTM4GW7FkVuYW3SCDvh/user-ndmTcw3a6oWXCohyeMejRcTS/img-KGtNXlw87C887C217P0YBy6K.png?st=2025-09-16T03%3A19%3A50Z&se=2025-09-16T05%3A19%3A50Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=cc612491-d948-4d2e-9821-2683df3719f5&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-15T16%3A01%3A39Z&ske=2025-09-16T16%3A01%3A39Z&sks=b&skv=2024-08-04&sig=Lvv1nGBNUm6xPnKm0FwXvwXkcjq9YXYe%2Bya93wNFwao%3D"
+  },
+  {
+    "id": "nft_1758007016353_1wp3pkj6d",
+    "type": "nft",
+    "userAddress": "GAK6GKLX5M7F5WQMZOJ3VZCHIFKEANY4CP2LHPLGF3NYUS7IX3QPSOUY",
+    "network": "TESTNET",
+    "plan": {
+      "network": "TESTNET",
+      "isComplete": false,
+      "needsInfo": [
+        "mediaUrl"
+      ],
+      "collectionName": "Hackathon",
+      "symbol": "HAKC3",
+      "totalSupply": 1000,
+      "royaltiesPct": 1,
+      "mediaUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/variants/variant-pixel-art-1758006918481-8qwo8i.png",
+      "originalUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/original-622f41fd234a9f23-1758006908278.jpg",
+      "originalSha256": "622f41fd234a9f23bcd02bd93b5d2d870b1688c04e88760989048d9a2f649c27",
+      "editParams": {
+        "preset": "pixel-art",
+        "intensity": 0.7,
+        "options": {
+          "variantCount": 1
+        }
+      },
+      "iterations": 1
+    },
+    "txHash": "f25fa8c0bcdc89549c11abe7711f71bdb94a499f81395c3cf8569b42b75c04ab",
+    "createdAt": "2025-09-16T07:16:56.354Z",
+    "name": "Hackathon",
+    "symbol": "HAKC3",
+    "supply": 1000,
+    "royalties": 1,
+    "imageUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/variants/variant-pixel-art-1758006918481-8qwo8i.png"
+
   }
 ]

@@ -144,11 +144,25 @@ const DeFiStrategist: React.FC = () => {
     needsInfo: ['riskTolerance', 'investmentAmount', 'preferredAssets']
   });
   const [executedStrategy, setExecutedStrategy] = useState<ExecutedStrategy | null>(null);
+  const [swapPlan, setSwapPlan] = useState<SwapPlan | null>(null);
+  const [swapTransaction, setSwapTransaction] = useState<any>(null);
+  const [executedSwap, setExecutedSwap] = useState<ExecutedSwap | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (swapPlan) {
+      setSwapPlan(prev => prev ? ({
+        ...prev,
+        from: publicKey || '',
+        to: publicKey || '',
+        network: network === 'TESTNET' ? 'testnet' : 'mainnet'
+      }) : null);
+    }
+  }, [publicKey, network]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

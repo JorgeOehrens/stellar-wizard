@@ -33,30 +33,46 @@ echo "📋 Using deployer account: $DEPLOYER_PUBLIC"
 
 # Deploy the NFT contract
 echo "📦 Installing NFT contract..."
-NFT_CONTRACT_ID=$(soroban contract install \
+NFT_CONTRACT_ID_HEX=$(stellar contract upload \
     --wasm "$NFT_WASM_FILE" \
-    --source-account stellar-wizard \
+    --source "$DEPLOYER_SECRET" \
     --network testnet \
-    2>/dev/null)
+    --network-passphrase "$NETWORK_PASSPHRASE" \
+    2>&1 | tail -1)
 
-if [ $? -eq 0 ] && [ ! -z "$NFT_CONTRACT_ID" ]; then
+if [ $? -eq 0 ] && [ ! -z "$NFT_CONTRACT_ID_HEX" ]; then
     echo "✅ NFT Contract deployed successfully!"
-    echo "📝 Contract ID: $NFT_CONTRACT_ID"
-    
-    # Update .env file with the contract ID
+    echo "📝 Contract ID (HEX): $NFT_CONTRACT_ID_HEX"
+
+    # Convert HEX to StrKey format
+    NFT_CONTRACT_ADDRESS=$(stellar contract address contract --id "$NFT_CONTRACT_ID_HEX" --network testnet)
+    echo "📝 Contract Address (StrKey): $NFT_CONTRACT_ADDRESS"
+
+    # Update .env file with both formats
     echo "💾 Updating .env file..."
-    sed -i.bak "s/NFT_CONTRACT_ID=.*/NFT_CONTRACT_ID=$NFT_CONTRACT_ID/" .env
-    rm -f .env.bak
-    
-    echo "💾 NFT_CONTRACT_ID saved to .env"
+
+    # Remove old entries if they exist
+    grep -v "^NFT_CONTRACT_ID_HEX=" .env > .env.tmp || true
+    grep -v "^NFT_CONTRACT_ADDRESS=" .env.tmp > .env.tmp2 || true
+    mv .env.tmp2 .env
+    rm -f .env.tmp
+
+    # Add new entries
+    echo "" >> .env
+    echo "# NFT Contract Information" >> .env
+    echo "NFT_CONTRACT_ID_HEX=$NFT_CONTRACT_ID_HEX" >> .env
+    echo "NFT_CONTRACT_ADDRESS=$NFT_CONTRACT_ADDRESS" >> .env
+
+    echo "💾 NFT contract addresses saved to .env"
     echo ""
     echo "🔧 Next steps:"
     echo "   1. Run ./scripts/deploy-registry.sh to deploy Registry contract"
     echo "   2. Initialize NFT contract with your collection metadata"
     echo ""
     echo "📋 For reference:"
-    echo "   NFT Contract ID: $NFT_CONTRACT_ID"
-    
+    echo "   NFT Contract ID (HEX): $NFT_CONTRACT_ID_HEX"
+    echo "   NFT Contract Address (StrKey): $NFT_CONTRACT_ADDRESS"
+
 else
     echo "❌ NFT Contract deployment failed"
     exit 1

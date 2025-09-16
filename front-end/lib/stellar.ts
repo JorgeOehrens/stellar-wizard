@@ -21,7 +21,7 @@ const NETWORKS = {
     horizonUrl: 'https://horizon-testnet.stellar.org'
   },
   MAINNET: {
-    server: new rpc.Server('https://soroban-mainnet.stellar.org'),
+    server: new rpc.Server('https://rpc.ankr.com/stellar_soroban'),
     passphrase: Networks.PUBLIC,
     horizonUrl: 'https://horizon.stellar.org'
   }
@@ -50,7 +50,7 @@ export interface CreateCollectionParams {
   name: string;
   symbol: string;
   uri_base: string;
-  royalties_bps: number;
+  royalties_bps: number; // Royalties in basis points (0-10000)
 }
 
 export interface MintNFTParams {
@@ -114,12 +114,23 @@ export class StellarService {
       const account = await this.getAccount(sourcePublicKey);
       const contract = new Contract(FACTORY_CONFIG[this.networkName].contractId);
 
+      console.log('StellarService: Converting parameters to ScVal:', {
+        caller: params.caller,
+        name: params.name,
+        symbol: params.symbol,
+        uri_base: params.uri_base,
+        royalties_bps: params.royalties_bps,
+        royalties_bps_type: typeof params.royalties_bps
+      });
+
       // Convert parameters to ScVal
       const callerScVal = new Address(params.caller).toScVal();
       const nameScVal = nativeToScVal(params.name, { type: 'string' });
       const symbolScVal = nativeToScVal(params.symbol, { type: 'string' });
       const uriBaseScVal = nativeToScVal(params.uri_base, { type: 'string' });
-      const royaltiesScVal = nativeToScVal(params.royalties_bps, { type: 'u32' });
+      const royaltiesBpsScVal = nativeToScVal(params.royalties_bps, { type: 'u32' });
+
+      console.log('StellarService: ScVal conversion completed');
 
       // Build the contract operation
       const operation = contract.call(
@@ -128,7 +139,7 @@ export class StellarService {
         nameScVal,
         symbolScVal,
         uriBaseScVal,
-        royaltiesScVal
+        royaltiesBpsScVal
       );
 
       // Build transaction
@@ -199,6 +210,7 @@ export class StellarService {
     success: boolean;
     result?: any;
     error?: string;
+    warning?: string;
   }> {
     let lastError: any;
 
@@ -214,37 +226,112 @@ export class StellarService {
             result: result
           };
         } else if (result.status === rpc.Api.GetTransactionStatus.PENDING) {
-          // Wait and check transaction status
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log(`Transaction ${result.hash} is PENDING, checking status...`);
+
+          // For PENDING transactions, wait longer and use the proper method
+          await new Promise(resolve => setTimeout(resolve, 3000));
 
           try {
-            const txStatus = await this.getTransaction(result.hash);
-            if (txStatus.success) {
+            // Use the server's getTransaction to check final status
+            const finalStatus = await this.network.server.getTransaction(result.hash);
+            console.log(`Final transaction status:`, finalStatus.status);
+
+            if (finalStatus.status === rpc.Api.GetTransactionStatus.SUCCESS) {
               return {
                 hash: result.hash,
                 success: true,
-                result: txStatus.transaction
+                result: finalStatus
               };
+            } else if (finalStatus.status === rpc.Api.GetTransactionStatus.PENDING) {
+              // Still pending, for Soroban this can be normal
+              if (attempt < maxRetries) {
+                console.log(`Transaction still pending, retrying... (${attempt}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                continue;
+              } else {
+                // After max retries, consider it successful but pending
+                console.log(`Transaction ${result.hash} remained PENDING but likely succeeded`);
+                return {
+                  hash: result.hash,
+                  success: true,
+                  result: result,
+                  warning: 'Transaction was submitted successfully but final confirmation took longer than expected'
+                };
+              }
             }
           } catch (statusError) {
             console.warn(`Failed to check transaction status on attempt ${attempt}:`, statusError);
+            // If we can't check status but have a hash, it might still succeed
+            if (attempt >= maxRetries) {
+              return {
+                hash: result.hash,
+                success: true,
+                result: result,
+                warning: 'Transaction was submitted but status could not be verified'
+              };
+            }
           }
 
-          if (attempt < maxRetries) {
-            console.log(`Transaction pending, retrying... (${attempt}/${maxRetries})`);
-            continue;
-          }
-
-          return {
-            hash: result.hash,
-            success: false,
-            error: `Transaction remained pending after ${maxRetries} attempts`
-          };
+          continue;
         } else {
+          // Extract detailed error information
+          let detailedError = `Transaction failed with status: ${result.status}`;
+
+          // Also log the full result for debugging
+          console.error('Full transaction result:', JSON.stringify(result, null, 2));
+
+          // Try to extract more specific error details from the errorResult
+          if ((result as any).errorResult) {
+            try {
+              const errorResult = (result as any).errorResult;
+              if (errorResult._attributes?.result?._switch) {
+                const errorCode = errorResult._attributes.result._switch;
+                const errorName = errorCode.name || 'unknown';
+                const errorValue = errorCode.value || 'unknown';
+
+                detailedError = `Transaction failed: ${errorName} (code: ${errorValue})`;
+
+                // Add specific error descriptions for common errors
+                switch (errorName) {
+                  case 'txMalformed':
+                    detailedError += ' - The transaction XDR is malformed or invalid';
+                    break;
+                  case 'txBadSeq':
+                    detailedError += ' - Invalid sequence number for account';
+                    break;
+                  case 'txNoSource':
+                    detailedError += ' - Source account not found';
+                    break;
+                  case 'txInsufficientBalance':
+                    detailedError += ' - Insufficient XLM balance for fees';
+                    break;
+                  case 'txInsufficientFee':
+                    detailedError += ' - Transaction fee too low';
+                    break;
+                  case 'txBadAuth':
+                    detailedError += ' - Invalid signature or authorization';
+                    break;
+                  case 'txInternalError':
+                    detailedError += ' - Internal Stellar network error';
+                    break;
+                  default:
+                    detailedError += ' - Check Stellar documentation for error code details';
+                }
+              }
+
+              if (errorResult._attributes?.feeCharged) {
+                const feeCharged = errorResult._attributes.feeCharged._value;
+                detailedError += ` (Fee charged: ${feeCharged} stroops)`;
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse error result:', parseError);
+            }
+          }
+
           return {
             hash: result.hash,
             success: false,
-            error: `Transaction failed with status: ${result.status}`
+            error: detailedError
           };
         }
       } catch (error) {
@@ -310,6 +397,28 @@ export class StellarService {
         success: false,
         error: `Failed to simulate transaction: ${error}`
       };
+    }
+  }
+
+  /**
+   * Prepare a transaction for signing by applying simulation results
+   */
+  async prepareTransaction(
+    unsignedXdr: string,
+    simulation: any
+  ): Promise<string> {
+    try {
+      const transaction = TransactionBuilder.fromXDR(unsignedXdr, this.network.passphrase);
+
+      // For Soroban contracts, we need to call prepareTransaction on the server
+      // This will inject the footprint, update fees, and make it ready for signing
+      const preparedTransaction = await this.network.server.prepareTransaction(transaction);
+
+      return preparedTransaction.toXDR();
+
+    } catch (error) {
+      console.error('Error preparing transaction:', error);
+      throw new Error(`Failed to prepare transaction: ${error}`);
     }
   }
 

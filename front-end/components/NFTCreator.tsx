@@ -71,7 +71,7 @@ interface NFTCollection {
 
 const NFTCreator: React.FC = () => {
   const { isConnected, publicKey, signTransaction } = useWallet();
-  const { network, getExplorerUrl } = useNetwork();
+  const { network, getExplorerUrl, getNetworkPassphrase } = useNetwork();
   const [currentPhase, setCurrentPhase] = useState<FlowPhase>(FlowPhase.COLLECTING);
   const [collectState, setCollectState] = useState<CollectState>({
     missing: ['collectionName', 'symbol', 'totalSupply', 'mediaUrlOrPrompt'],
@@ -344,6 +344,50 @@ stellar contract invoke \\
     });
   };
 
+  const handleQuickCreateNFT = async () => {
+    if (isMinting) return;
+
+    // Check if mainnet is selected but not supported yet
+    if (network === 'MAINNET') {
+      const warningMessage: Message = {
+        role: 'assistant',
+        content: "⚠️ **MAINNET not yet supported**\\n\\nThe Factory contract is not yet deployed on MAINNET. Please switch to TESTNET to create NFT collections.\\n\\nYou can switch networks using the toggle in the top-right corner.",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, warningMessage]);
+      return;
+    }
+
+    // Set default NFT plan values
+    const defaultPlan: NFTPlan = {
+      collectionName: "Quick Test Collection",
+      symbol: "QUICK",
+      totalSupply: 100,
+      description: "Test NFT collection created with one click",
+      royaltiesPct: 2.5,
+      mediaUrl: "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=500",
+      network: network as 'TESTNET' | 'MAINNET',
+      isComplete: true,
+      needsInfo: []
+    };
+
+    setNftPlan(defaultPlan);
+
+    // Add a quick message to chat
+    const quickMessage: Message = {
+      role: 'assistant',
+      content: "🚀 **Quick NFT created with default settings!**\\n\\nYou can now sign the transaction to mint your test collection.",
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, quickMessage]);
+
+    // Move directly to minting phase
+    setCurrentPhase(FlowPhase.MINTING);
+
+    // Call the existing transaction handler
+    return handleSignTransaction();
+  };
+
   const handleSignTransaction = async () => {
     if (!nftPlan.collectionName || !nftPlan.totalSupply || !nftPlan.mediaUrl || isMinting) return;
 
@@ -352,6 +396,17 @@ stellar contract invoke \\
     setCurrentPhase(FlowPhase.MINTING);
 
     try {
+      console.log('Starting NFT collection creation:', JSON.stringify({
+          collectionName: nftPlan.collectionName,
+          symbol: nftPlan.symbol,
+          totalSupply: nftPlan.totalSupply,
+          description: nftPlan.description,
+          royaltiesPct: 250, // Test value: 2.5% royalties (valid range 0-10000)
+          mediaUrl: nftPlan.mediaUrl,
+          airdrop: nftPlan.airdrop,
+          network,
+          userAddress: publicKey
+        }));
       // Step 1: Create collection via factory
       const createResponse = await fetch('/api/nft/mint', {
         method: 'POST',
@@ -363,7 +418,7 @@ stellar contract invoke \\
           symbol: nftPlan.symbol,
           totalSupply: nftPlan.totalSupply,
           description: nftPlan.description,
-          royaltiesPct: nftPlan.royaltiesPct,
+          royaltiesPct: 250, // Test value: 2.5% royalties (valid range 0-10000)
           mediaUrl: nftPlan.mediaUrl,
           airdrop: nftPlan.airdrop,
           network,
@@ -377,7 +432,7 @@ stellar contract invoke \\
 
       const {
         success,
-        createCollectionXdr,
+        xdr: preparedXdr,
         simulation,
         network: stellarNetwork,
         factoryContract,
@@ -395,7 +450,12 @@ stellar contract invoke \\
       });
 
       // Step 2: Sign and submit the collection creation transaction
-      const signedTx = await signTransaction(createCollectionXdr, stellarNetwork);
+      const networkPassphrase = getNetworkPassphrase();
+
+      const signedTx = await signTransaction(preparedXdr, {
+        networkPassphrase: networkPassphrase
+      });
+
       if (!signedTx) {
         throw new Error('User cancelled transaction signing');
       }
@@ -417,6 +477,11 @@ stellar contract invoke \\
 
       const hash = submitResult.hash;
       console.log('Collection created successfully:', hash);
+
+      // Log warning if present
+      if (submitResult.warning) {
+        console.log('Transaction warning:', submitResult.warning);
+      }
 
       // Step 3: Handle airdrop if specified
       let airdropResults = [];
@@ -445,7 +510,9 @@ stellar contract invoke \\
 
         const mintData = await mintResponse.json();
         if (mintData.success) {
-          const signedMintTx = await signTransaction(mintData.mintXdr, stellarNetwork);
+          const signedMintTx = await signTransaction(mintData.mintXdr, {
+            networkPassphrase: networkPassphrase
+          });
           if (signedMintTx) {
             const mintSubmitResponse = await fetch('/api/stellar/submit', {
               method: 'POST',
@@ -709,6 +776,34 @@ stellar contract invoke \\
           <p className="text-xl text-readable-muted">
             Chat with the wizard to create your perfect NFT collection
           </p>
+          <div className="mt-4">
+            <Button
+              onClick={handleQuickCreateNFT}
+              disabled={isMinting || !isConnected}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-2"
+            >
+              {isMinting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating & Signing...
+                </>
+              ) : !isConnected ? (
+                <>
+                  🔗 Connect Wallet First
+                </>
+              ) : (
+                <>
+                  🚀 Quick Create & Sign NFT
+                </>
+              )}
+            </Button>
+            <p className="text-sm text-muted-foreground mt-2">
+              {!isConnected
+                ? "Connect your Stellar wallet to create and sign NFT transactions"
+                : "Creates a test NFT collection with default settings and opens wallet for signing"
+              }
+            </p>
+          </div>
         </div>
 
         {/* Progress Steps */}
@@ -743,7 +838,7 @@ stellar contract invoke \\
               [FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">4</span>
-              CLI Commands
+              Sign
             </div>
             <div className="w-8 h-px bg-border" />
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${

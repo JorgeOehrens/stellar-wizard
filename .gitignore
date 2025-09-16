@@ -1,0 +1,34 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+front-end/node_modules
+
+# next.js
+front-end/.next/
+front-end/out/
+
+# production
+front-end/build
+.claude
+front-end/.claude
+# debug
+front-end/npm-debug.log*
+front-end/yarn-debug.log*
+front-end/yarn-error.log*
+front-end/.pnpm-debug.log*
+
+# env files
+front-end/.env*
+
+# vercel
+front-end/.vercel
+
+# typescript
+front-end/*.tsbuildinfo
+front-end/next-env.d.ts
+
+# local env files
+front-end/.env.local
+front-end/.env.development.local
+front-end/.env.test.local
+front-end/.env.production.local

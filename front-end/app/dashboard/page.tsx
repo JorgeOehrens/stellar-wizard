@@ -116,7 +116,7 @@ const Dashboard: React.FC = () => {
       const response = await fetch(`/api/factory/nfts?userAddress=${publicKey}&network=${network.toLowerCase()}`);
       if (response.ok) {
         const data = await response.json();
-        setFactoryCollections(data.collections || []);
+        // setFactoryCollections(data.collections || []);
         console.log('Factory collections loaded:', data);
       }
     } catch (error) {
@@ -264,12 +264,12 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="factory-nfts" className="space-y-6">
+        <Tabs defaultValue="nfts" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="factory-nfts" className="flex items-center gap-2">
+            {/* <TabsTrigger value="factory-nfts" className="flex items-center gap-2">
               <Zap className="w-4 h-4" />
               Factory NFTs ({factoryCollections.length})
-            </TabsTrigger>
+            </TabsTrigger> */}
             <TabsTrigger value="nfts" className="flex items-center gap-2">
               <ImageIcon className="w-4 h-4" />
               NFT Collections ({nftCreations.length})

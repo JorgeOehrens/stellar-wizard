@@ -11,7 +11,7 @@ const HeroSection: React.FC = () => {
   const { isConnected, connect } = useWallet();
 
   return (
-    <div className="relative min-h-screen flex items-center bg-overlay">
+    <div className="relative min-h-screen flex items-center bg-overlay-light dark:bg-overlay">
       {/* Magic Ball Decoration */}
       <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden lg:block opacity-20 dark:opacity-10">
         <Image
@@ -34,20 +34,20 @@ const HeroSection: React.FC = () => {
           </div>
           
           {/* Main Heading - HackMeridian style */}
-          <h1 className="hackmeridian-headline text-5xl lg:text-8xl text-white dark:text-text-dark mb-8 tracking-wider leading-tight">
+          <h1 className="hackmeridian-headline text-5xl lg:text-8xl text-hk-black dark:text-white mb-8 tracking-wider leading-tight">
             FROM PROMPT
             <br />
             <span className="text-hk-yellow">
               TO BLOCKCHAIN
             </span>
             <br />
-            <span className="hackmeridian-tagline text-3xl lg:text-5xl normal-case tracking-normal text-white/90 dark:text-gray-300">
+            <span className="hackmeridian-tagline text-3xl lg:text-5xl normal-case tracking-normal text-hk-gray dark:text-gray-300">
               in one click
             </span>
           </h1>
           
           {/* Subtitle */}
-          <p className="text-xl lg:text-2xl text-white/90 dark:text-gray-200 mb-12 max-w-4xl mx-auto leading-relaxed">
+          <p className="text-xl lg:text-2xl text-hk-gray dark:text-gray-200 mb-12 max-w-4xl mx-auto leading-relaxed">
             Create NFTs, deploy DeFi strategies, and interact with Stellar using natural language. 
             <br className="hidden lg:block" />
             No coding required—just describe what you want to build.
@@ -84,7 +84,7 @@ const HeroSection: React.FC = () => {
           
           {/* Features Grid */}
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="p-6 bg-white/10 backdrop-blur border border-white/20 rounded-xl">
+            <div className="p-6 bg-white/80 dark:bg-white/10 backdrop-blur border border-black/20 dark:border-white/20 rounded-xl">
               <div className="w-12 h-12 bg-hk-yellow/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
                 <Image
                   src="/wizzard.svg"
@@ -94,34 +94,34 @@ const HeroSection: React.FC = () => {
                   className="object-contain"
                 />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
+              <h3 className="text-lg font-semibold text-hk-black dark:text-white mb-2">
                 AI-Powered Creation
               </h3>
-              <p className="text-white/80 text-sm">
+              <p className="text-hk-gray dark:text-white/80 text-sm">
                 Describe your vision in plain English and watch it come to life on the blockchain
               </p>
             </div>
             
-            <div className="p-6 bg-white/10 backdrop-blur border border-white/20 rounded-xl">
+            <div className="p-6 bg-white/80 dark:bg-white/10 backdrop-blur border border-black/20 dark:border-white/20 rounded-xl">
               <div className="w-12 h-12 bg-hk-yellow/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
                 <Zap className="w-6 h-6 text-hk-yellow" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
+              <h3 className="text-lg font-semibold text-hk-black dark:text-white mb-2">
                 One-Click Deployment
               </h3>
-              <p className="text-white/80 text-sm">
+              <p className="text-hk-gray dark:text-white/80 text-sm">
                 From concept to contract deployment in seconds, not hours
               </p>
             </div>
             
-            <div className="p-6 bg-white/10 backdrop-blur border border-white/20 rounded-xl">
+            <div className="p-6 bg-white/80 dark:bg-white/10 backdrop-blur border border-black/20 dark:border-white/20 rounded-xl">
               <div className="w-12 h-12 bg-hk-yellow/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
                 <Sparkles className="w-6 h-6 text-hk-yellow" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
+              <h3 className="text-lg font-semibold text-hk-black dark:text-white mb-2">
                 Stellar Network
               </h3>
-              <p className="text-white/80 text-sm">
+              <p className="text-hk-gray dark:text-white/80 text-sm">
                 Built on Stellar's fast, low-cost, and scalable blockchain infrastructure
               </p>
             </div>

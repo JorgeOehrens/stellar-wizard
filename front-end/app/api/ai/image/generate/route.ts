@@ -47,6 +47,7 @@ function isValidImagePrompt(prompt: string): boolean {
   return true;
 }
 
+
 export async function POST(request: NextRequest) {
   try {
     const { prompt, size = "1024x1024" } = await request.json();
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+
     if (!openai) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
     const response = await openai.images.generate({
       model: "dall-e-3",
       prompt: cleanedPrompt,
+
       size: size as "1024x1024" | "1024x1792" | "1792x1024",
       quality: "standard",
       n: 1,
@@ -93,6 +96,7 @@ export async function POST(request: NextRequest) {
       imageUrl,
       prompt: cleanedPrompt,
       originalPrompt: prompt
+
     });
 
   } catch (error) {

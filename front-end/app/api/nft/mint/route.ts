@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStellarService } from '../../../../lib/stellar';
 
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
           network: stellarNetwork,
           suggestion: 'Switch to TESTNET to create NFT collections',
         },
+
         { status: 400 }
       );
     }
@@ -150,3 +152,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

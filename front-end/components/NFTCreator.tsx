@@ -56,6 +56,30 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+
+}
+
+interface NFTPlan {
+  collectionName?: string;
+  symbol?: string;
+  totalSupply?: number;
+  description?: string;
+  royaltiesPct?: number;
+  mediaUrl?: string;
+  mediaPrompt?: string;
+  airdrop?: {
+    recipient: string;
+    amount?: number;
+  } | null;
+  network: 'TESTNET' | 'MAINNET';
+  isComplete: boolean;
+  needsInfo: string[];
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
 }
 
 interface NFTCollection {
@@ -82,6 +106,7 @@ const NFTCreator: React.FC = () => {
     {
       role: 'assistant',
       content: "🧙‍♂️ **Welcome, fellow creator!**\\n\\nI'm the Stellar NFT Wizard, here to help you bring your digital collection to life on the Stellar blockchain.\\n\\n✨ **What I can help you with:**\\n- Create NFT collections with custom names and symbols\\n- Generate stunning AI artwork for your NFTs\\n- Set up royalties and airdrops\\n- Deploy everything to Stellar's network\\n\\n💬 **Would you like to start by naming your NFT collection, or do you have a question first?**\\n\\nFeel free to ask questions or jump right in!",
+
       timestamp: new Date()
     }
   ]);
@@ -91,6 +116,7 @@ const NFTCreator: React.FC = () => {
   const nudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [conversationId] = useState(`conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [lastMessageRole, setLastMessageRole] = useState<'user' | 'assistant'>('assistant');
+
   const [nftPlan, setNftPlan] = useState<NFTPlan>({
     network: 'TESTNET',
     isComplete: false,
@@ -386,6 +412,7 @@ stellar contract invoke \\
 
     // Call the existing transaction handler
     return handleSignTransaction();
+
   };
 
   const handleSignTransaction = async () => {
@@ -581,6 +608,7 @@ stellar contract invoke \\
       };
       setMessages(prev => [...prev, successMessage]);
 
+
     } catch (error) {
       console.error('Transaction failed:', error);
       
@@ -592,6 +620,7 @@ stellar contract invoke \\
         errorMessage = error;
       }
       
+
       // Log error to API if available
       try {
         await fetch('/api/log', {
@@ -602,6 +631,7 @@ stellar contract invoke \\
             error: errorMessage,
             planId: `${nftPlan.collectionName}-${Date.now()}`,
             errorDetails: error
+
           })
         });
       } catch (logError) {
@@ -629,6 +659,7 @@ stellar contract invoke \\
       };
       setMessages(prev => [...prev, assistantErrorMessage]);
       setCurrentPhase(FlowPhase.CLI_COMMANDS); // Go back to CLI commands page to show alternative
+
     }
 
     setIsMinting(false);
@@ -645,6 +676,7 @@ stellar contract invoke \\
       return;
     }
 
+
     setIsGeneratingImage(true);
     try {
       const response = await fetch('/api/ai/image/generate', {
@@ -654,6 +686,7 @@ stellar contract invoke \\
         },
         body: JSON.stringify({
           prompt: prompt.trim(),
+
           size: "1024x1024"
         }),
       });
@@ -661,17 +694,20 @@ stellar contract invoke \\
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+
       }
 
       const data = await response.json();
       setGeneratedImage(data.imageUrl);
       setImagePrompt(data.prompt || prompt); // Use cleaned prompt if available
 
+
     } catch (error) {
       console.error('Image generation failed:', error);
       const errorMessage: Message = {
         role: 'assistant',
         content: `⚠️ **I had trouble generating that image:**\\n${error instanceof Error ? error.message : 'Unknown error'}\\n\\n🎨 **Try being more specific about what you want to see!**\\n\\n**Examples:**\\n- **A majestic dragon with golden scales**\\n- **A cute robot in a futuristic city**`,
+
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -687,6 +723,7 @@ stellar contract invoke \\
         mediaPrompt: imagePrompt
       }));
       setCurrentPhase(FlowPhase.CONFIRMING);
+
     }
   };
 
@@ -713,6 +750,7 @@ stellar contract invoke \\
     setMessages([{
       role: 'assistant',
       content: "🧙‍♂️ **Ready for another magical NFT creation?**\\n\\nLet's bring your next digital collection to life!\\n\\n✨ **What I can help you with:**\\n- Create NFT collections with custom names and symbols\\n- Generate stunning AI artwork for your NFTs\\n- Set up royalties and airdrops\\n- Deploy everything to Stellar's network\\n\\n💬 **Would you like to start by naming your NFT collection, or do you have a question first?**\\n\\nFeel free to ask questions or jump right in!",
+
       timestamp: new Date()
     }]);
     setNftPlan({
@@ -737,6 +775,7 @@ stellar contract invoke \\
       nudgeCountForField: {},
       lastNudgeKey: undefined
     });
+
   };
 
   if (!isConnected) {
@@ -812,6 +851,7 @@ stellar contract invoke \\
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
               currentPhase === FlowPhase.COLLECTING ? 'bg-primary text-primary-foreground' : 
               [FlowPhase.IMAGE_GENERATION, FlowPhase.CONFIRMING, FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">1</span>
               Chat with AI
@@ -820,6 +860,7 @@ stellar contract invoke \\
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
               currentPhase === FlowPhase.IMAGE_GENERATION ? 'bg-primary text-primary-foreground' : 
               [FlowPhase.CONFIRMING, FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">2</span>
               Generate Image
@@ -828,6 +869,7 @@ stellar contract invoke \\
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
               currentPhase === FlowPhase.CONFIRMING ? 'bg-primary text-primary-foreground' : 
               [FlowPhase.CLI_COMMANDS, FlowPhase.MINTING, FlowPhase.DONE].includes(currentPhase) ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">3</span>
               Review Plan
@@ -846,6 +888,7 @@ stellar contract invoke \\
               currentPhase === FlowPhase.DONE ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
             }`}>
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">5</span>
+
               Deploy NFTs
             </div>
           </div>
@@ -853,6 +896,7 @@ stellar contract invoke \\
 
         {/* Main Content */}
         {currentPhase === FlowPhase.COLLECTING && (
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Chat Interface */}
             <Card className="lg:col-span-2">
@@ -901,6 +945,7 @@ stellar contract invoke \\
                             </div>
                           ))}
                         </div>
+
                         <p className="text-xs opacity-60 mt-1">
                           {message.timestamp.toLocaleTimeString()}
                         </p>
@@ -951,6 +996,7 @@ stellar contract invoke \\
                     ) : (
                       <Send className="w-4 h-4" />
                     )}
+
                   </Button>
                 </div>
               </CardContent>
@@ -1042,6 +1088,7 @@ stellar contract invoke \\
                 )}
 
                 {nftPlan.needsInfo.length > 0 && !nftPlan.pendingConfirmation && (
+
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Still Needed</label>
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -1055,6 +1102,7 @@ stellar contract invoke \\
                 )}
 
                 {nftPlan.isComplete && !nftPlan.pendingConfirmation && (
+
                   <Badge className="w-full justify-center bg-green-500">
                     <CheckCircle className="w-4 h-4 mr-1" />
                     Plan Complete!
@@ -1066,6 +1114,7 @@ stellar contract invoke \\
         )}
 
         {currentPhase === FlowPhase.IMAGE_GENERATION && (
+
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1143,6 +1192,7 @@ stellar contract invoke \\
                     <p className="text-xs text-center text-muted-foreground">
                       💡 Tip: You can regenerate or edit the prompt until you're happy with the result!
                     </p>
+
                   </div>
                 </div>
               )}
@@ -1151,6 +1201,7 @@ stellar contract invoke \\
         )}
 
         {currentPhase === FlowPhase.CONFIRMING && (
+
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1159,6 +1210,7 @@ stellar contract invoke \\
               </CardTitle>
               <CardDescription>
                 Review all details carefully before proceeding to mint
+
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1206,6 +1258,7 @@ stellar contract invoke \\
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Image Prompt</label>
                     <p className="text-sm italic">"{nftPlan.mediaPrompt}"</p>
+
                   </div>
                 )}
                 {nftPlan.airdrop?.recipient && (
@@ -1214,6 +1267,7 @@ stellar contract invoke \\
                     <p className="text-sm font-mono break-all">{nftPlan.airdrop.recipient}</p>
                     {nftPlan.airdrop.amount && (
                       <p className="text-xs text-muted-foreground">{nftPlan.airdrop.amount} NFTs will be airdropped</p>
+
                     )}
                   </div>
                 )}
@@ -1243,6 +1297,7 @@ stellar contract invoke \\
                   >
                     Yes - Show CLI Commands
                   </Button>
+
                 </div>
               </div>
             </CardContent>
@@ -1340,15 +1395,16 @@ stellar contract invoke \\
                 <Button 
                   onClick={handleSignTransaction}
                   disabled={isMinting}
+
                   className="flex-1"
                 >
                   {isMinting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Minting via UI...
                     </>
                   ) : (
                     'Or Mint via UI'
+
                   )}
                 </Button>
                 <Button onClick={resetFlow} variant="outline" className="flex-1">
@@ -1373,12 +1429,14 @@ stellar contract invoke \\
         )}
 
         {currentPhase === FlowPhase.DONE && finalCollection && (
+
           <Card className="max-w-2xl mx-auto">
             <CardContent className="py-12 text-center">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-6" />
               <h3 className="text-2xl font-bold mb-2">🎉 Your NFT collection has been created!</h3>
               <p className="text-muted-foreground mb-8">
                 <strong>"{finalCollection.name}"</strong> collection is now live on Stellar {network}
+
               </p>
               
               <div className="space-y-4 text-left bg-muted/50 rounded-lg p-6 mb-8">
@@ -1404,6 +1462,7 @@ stellar contract invoke \\
                     </div>
                   </div>
                 )}
+
                 {finalCollection.airdropAddress && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Airdropped To</label>
@@ -1426,6 +1485,7 @@ stellar contract invoke \\
                     variant="outline" 
                     asChild
                     className="flex-1"
+
                   >
                     <a 
                       href={getExplorerUrl('tx', finalCollection.transactionHash!)}

@@ -96,6 +96,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       } else {
         throw new Error('Failed to sign transaction - please check your wallet connection');
       }
+
     }
   };
 

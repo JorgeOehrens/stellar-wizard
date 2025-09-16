@@ -18,10 +18,12 @@ enum FlowType {
   SWAP = 'swap'
 }
 
+
 enum FlowStep {
   CONVERSATION = 'conversation',
   STRATEGY_READY = 'strategy-ready',
   SWAP_READY = 'swap-ready',
+
   RISK_WARNING = 'risk-warning',
   SIGNING = 'signing',
   SUCCESS = 'success'
@@ -54,6 +56,7 @@ interface SwapPlan {
   priceImpact?: number;
   route?: any;
 }
+
 
 interface DeFiAllocation {
   protocol: string;
@@ -117,16 +120,42 @@ const DeFiStrategist: React.FC = () => {
   const { isConnected, publicKey, signTransaction } = useWallet();
   const { network, getExplorerUrl } = useNetwork();
   const [flowType, setFlowType] = useState<FlowType>(FlowType.INITIAL);
+
   const [currentStep, setCurrentStep] = useState<FlowStep>(FlowStep.CONVERSATION);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
       content: "💰 Welcome! I'm your DeFi Wizard. I can help you with two things:\n\n🔹 **Invest** - Build personalized investment strategies using DeFindex protocols\n🔹 **Swap** - Exchange tokens using Soroswap with the best rates\n\nWhich would you like to do today?",
+
       timestamp: new Date()
     }
   ]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [strategy, setStrategy] = useState<DeFiStrategy>({
+    profile: {},
+    allocations: [],
+    totalEstimatedApy: 0,
+    totalRiskScore: 0,
+    warnings: [],
+    fees: { dappFee: 0, protocolFees: 0, gasEstimate: 0 },
+    network: 'TESTNET',
+    isComplete: false,
+    needsInfo: ['riskTolerance', 'investmentAmount', 'preferredAssets']
+  });
+  const [executedStrategy, setExecutedStrategy] = useState<ExecutedStrategy | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const sendMessage = async () => {
+    if (!currentMessage.trim() || isLoading) return;
 
   const getDefaultStrategy = (): DeFiStrategy => ({
     profile: {},
@@ -183,6 +212,7 @@ const DeFiStrategist: React.FC = () => {
       const endpoint = '/api/defi-wizard';
 
       const response = await fetch(endpoint, {
+
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,6 +227,7 @@ const DeFiStrategist: React.FC = () => {
           flowType,
           network: network.toLowerCase(),
           userAddress: publicKey
+
         }),
       });
 
@@ -243,6 +274,7 @@ const DeFiStrategist: React.FC = () => {
         content: 'I apologize, but I encountered an error. Please try again.',
         timestamp: new Date()
       };
+
       setMessages(prev => [...prev, errorMessage]);
     }
 
@@ -263,6 +295,7 @@ const DeFiStrategist: React.FC = () => {
       content: flowType === FlowType.SWAP
         ? "What would you like to change about your swap? I can help you adjust the assets, amount, slippage, or any other aspect."
         : "What would you like to change about your investment strategy? I can help you adjust your risk level, allocations, or any other aspect of the plan.",
+
       timestamp: new Date()
     };
     setMessages(prev => [...prev, modifyMessage]);
@@ -432,6 +465,7 @@ const DeFiStrategist: React.FC = () => {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+
     }
 
     setIsLoading(false);
@@ -443,6 +477,7 @@ const DeFiStrategist: React.FC = () => {
     setMessages([{
       role: 'assistant',
       content: "💰 Welcome back! Would you like to **invest** in DeFi strategies or **swap** tokens today?",
+
       timestamp: new Date()
     }]);
     setStrategy({
@@ -469,6 +504,7 @@ const DeFiStrategist: React.FC = () => {
     });
     setExecutedStrategy(null);
     setExecutedSwap(null);
+
     setIsLoading(false);
   };
 
@@ -503,6 +539,7 @@ const DeFiStrategist: React.FC = () => {
           </h1>
           <p className="text-readable-muted mb-8">
             Connect your wallet to start building personalized DeFi investment strategies or swap tokens
+
           </p>
           <Card className="p-8">
             <CardContent className="text-center">
@@ -518,6 +555,7 @@ const DeFiStrategist: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-bg-light dark:bg-bg-dark">
+
       <div className="max-w-4xl mx-auto p-6">
         {/* Header */}
         <div className="text-center mb-8">
@@ -525,6 +563,7 @@ const DeFiStrategist: React.FC = () => {
             <div></div>
             <h1 className="hackmeridian-headline text-4xl font-bold text-readable">
               DEFI WIZARD
+
             </h1>
             <NetworkToggle />
           </div>
@@ -532,10 +571,10 @@ const DeFiStrategist: React.FC = () => {
             {flowType === FlowType.INVEST ? 'Build personalized investment strategies with AI guidance' :
              flowType === FlowType.SWAP ? 'Swap tokens with optimal routing and best rates' :
              'Invest in DeFi strategies or swap tokens with AI guidance'}
+
           </p>
         </div>
 
-        {/* Progress Steps */}
         {flowType !== FlowType.INITIAL && (
           <div className="flex items-center justify-center mb-8">
             <div className="flex items-center gap-4">
@@ -562,6 +601,7 @@ const DeFiStrategist: React.FC = () => {
                 <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">3</span>
                 Execute
               </div>
+
             </div>
           </div>
         )}
@@ -580,6 +620,7 @@ const DeFiStrategist: React.FC = () => {
                   {flowType === FlowType.INVEST ? 'Discuss your goals, risk tolerance, and preferred assets' :
                    flowType === FlowType.SWAP ? 'Configure your token swap with optimal routing' :
                    'Choose between investing in DeFi strategies or swapping tokens'}
+
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -602,6 +643,7 @@ const DeFiStrategist: React.FC = () => {
                             {getFlowIcon()}
                             <span className="text-xs font-medium text-muted-foreground">
                               {getFlowTitle()}
+
                             </span>
                           </div>
                         )}
@@ -620,6 +662,7 @@ const DeFiStrategist: React.FC = () => {
                           <Loader2 className="w-4 h-4 animate-spin" />
                           <span className="text-sm text-muted-foreground">
                             {getFlowTitle()} is analyzing...
+
                           </span>
                         </div>
                       </div>
@@ -639,6 +682,7 @@ const DeFiStrategist: React.FC = () => {
                       flowType === FlowType.SWAP ? "Tell me what tokens you want to swap..." :
                       "Tell me about your investment goals..."
                     }
+
                     disabled={isLoading}
                     rows={2}
                     className="flex-1 resize-none"
@@ -851,6 +895,7 @@ const DeFiStrategist: React.FC = () => {
         )}
 
         {/* Investment Strategy Ready Screen */}
+
         {currentStep === FlowStep.STRATEGY_READY && strategy.isComplete && (
           <Card className="max-w-4xl mx-auto">
             <CardHeader>
@@ -862,6 +907,7 @@ const DeFiStrategist: React.FC = () => {
                 {(strategy as any).vaultRecommendation
                   ? 'Review your vault recommendation and projected returns'
                   : 'Review your personalized DeFi allocation before execution'}
+
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1022,6 +1068,7 @@ const DeFiStrategist: React.FC = () => {
                 </div>
               </div>
 
+
               <div className="flex gap-3">
                 <Button onClick={modifyStrategy} variant="outline" className="flex-1">
                   Modify Strategy
@@ -1034,7 +1081,7 @@ const DeFiStrategist: React.FC = () => {
           </Card>
         )}
 
-        {/* Risk Warning Screen */}
+
         {currentStep === FlowStep.RISK_WARNING && (
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
@@ -1086,6 +1133,7 @@ const DeFiStrategist: React.FC = () => {
                   <div className="flex justify-between">
                     <span>Risk Level:</span>
                     <span className="font-mono">{strategy.totalRiskScore || 5}/10</span>
+
                   </div>
                   <div className="flex justify-between">
                     <span>Network:</span>
@@ -1099,6 +1147,7 @@ const DeFiStrategist: React.FC = () => {
                   Back to Review
                 </Button>
                 <Button
+
                   onClick={handleExecuteStrategy}
                   disabled={isLoading}
                   className="flex-1"
@@ -1118,6 +1167,7 @@ const DeFiStrategist: React.FC = () => {
               <h3 className="text-lg font-semibold mb-2">
                 {flowType === FlowType.SWAP ? 'Executing Swap' : 'Executing Investment Strategy'}
               </h3>
+
               <p className="text-muted-foreground mb-4">
                 Please sign the transactions in your Freighter wallet...
               </p>
@@ -1138,6 +1188,7 @@ const DeFiStrategist: React.FC = () => {
                 {flowType === FlowType.SWAP
                   ? `Your token swap has been completed on Stellar ${network}`
                   : `Your investment strategy has been deployed to DeFindex protocols on Stellar ${network}`}
+
               </p>
 
               <div className="space-y-4 text-left bg-muted/50 rounded-lg p-6 mb-8">
@@ -1182,6 +1233,7 @@ const DeFiStrategist: React.FC = () => {
                     </div>
                   </>
                 )}
+
               </div>
 
               <div className="flex gap-3">
@@ -1192,6 +1244,7 @@ const DeFiStrategist: React.FC = () => {
                 >
                   <a
                     href={getExplorerUrl('tx', executedSwap?.transactionHash || executedStrategy?.transactionHash || '')}
+
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -1201,6 +1254,7 @@ const DeFiStrategist: React.FC = () => {
                 </Button>
                 <Button onClick={resetFlow} className="flex-1">
                   {flowType === FlowType.SWAP ? 'New Swap' : 'Create New Strategy'}
+
                 </Button>
               </div>
             </CardContent>

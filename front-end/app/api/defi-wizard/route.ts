@@ -229,12 +229,14 @@ export async function POST(request: NextRequest) {
       systemContext += `\n\nIMPORTANT: Build upon this existing information. Do not restart or ask for information already provided.`;
     }
 
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [
         {
           role: 'system',
           content: systemContext
+
         },
         ...messages,
       ],
@@ -330,6 +332,7 @@ export async function POST(request: NextRequest) {
           }
         },
         {
+
           name: 'create_defi_strategy',
           description: 'Create a personalized DeFi investment strategy with allocations',
           parameters: {
@@ -595,6 +598,7 @@ export async function POST(request: NextRequest) {
           questions: validatedStrategy.needsInfo,
         });
       }
+
     }
 
     return NextResponse.json({
@@ -818,4 +822,5 @@ async function handleSwapFlow(messages: any[], network: string, userAddress?: st
       swapReady: false
     };
   }
+
 }

@@ -81,9 +81,21 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     try {
       const { signedTxXdr } = await kit.signTransaction(xdr, options);
       return signedTxXdr;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to sign transaction:', error);
-      throw error;
+      
+      // Provide more specific error messages
+      if (error?.message?.includes('User denied') || error?.message?.includes('rejected')) {
+        throw new Error('User rejected the transaction in wallet');
+      } else if (error?.message?.includes('timeout')) {
+        throw new Error('Transaction signing timed out');
+      } else if (error?.message?.includes('invalid') || error?.message?.includes('malformed')) {
+        throw new Error('Invalid transaction data - this might be a development/testing issue');
+      } else if (error?.message) {
+        throw new Error(`Wallet error: ${error.message}`);
+      } else {
+        throw new Error('Failed to sign transaction - please check your wallet connection');
+      }
     }
   };
 

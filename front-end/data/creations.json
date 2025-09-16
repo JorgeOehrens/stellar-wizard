@@ -1,0 +1,24 @@
+[
+  {
+    "id": "nft_1757983706936_e7yc4dsst",
+    "type": "nft",
+    "userAddress": "GAK6GKLX5M7F5WQMZOJ3VZCHIFKEANY4CP2LHPLGF3NYUS7IX3QPSOUY",
+    "network": "TESTNET",
+    "plan": {
+      "network": "TESTNET",
+      "isComplete": true,
+      "needsInfo": [],
+      "collectionName": "HACKATHON MERIDIAN",
+      "symbol": "HEOER",
+      "totalSupply": 200,
+      "mediaPrompt": "Nature with animals in a digital art style",
+      "mediaUrl": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-eEIioyTM4GW7FkVuYW3SCDvh/user-ndmTcw3a6oWXCohyeMejRcTS/img-6ltpSWyCWB2BszizrNCmLKm4.png?st=2025-09-15T23%3A48%3A16Z&se=2025-09-16T01%3A48%3A16Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=b1a0ae1f-618f-4548-84fd-8b16cacd5485&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-15T20%3A50%3A30Z&ske=2025-09-16T20%3A50%3A30Z&sks=b&skv=2024-08-04&sig=dFmouNTYe6l6MoUZ7PInwui1R2I5WrVBTGEy8gAS8HE%3D"
+    },
+    "txHash": "mock_tx_1757983706481_8z8toyfp4",
+    "createdAt": "2025-09-16T00:48:26.936Z",
+    "name": "HACKATHON MERIDIAN",
+    "symbol": "HEOER",
+    "supply": 200,
+    "imageUrl": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-eEIioyTM4GW7FkVuYW3SCDvh/user-ndmTcw3a6oWXCohyeMejRcTS/img-6ltpSWyCWB2BszizrNCmLKm4.png?st=2025-09-15T23%3A48%3A16Z&se=2025-09-16T01%3A48%3A16Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=b1a0ae1f-618f-4548-84fd-8b16cacd5485&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-15T20%3A50%3A30Z&ske=2025-09-16T20%3A50%3A30Z&sks=b&skv=2024-08-04&sig=dFmouNTYe6l6MoUZ7PInwui1R2I5WrVBTGEy8gAS8HE%3D"
+  }
+]

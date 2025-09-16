@@ -125,6 +125,7 @@ export default function DeFiPage() {
           </div>
 
         </div>
+
       </div>
     </div>
   );

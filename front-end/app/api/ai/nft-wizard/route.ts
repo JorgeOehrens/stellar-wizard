@@ -68,6 +68,8 @@ Validation rules:
 - Royalty percentage: 0-10%
 - Stellar addresses: must start with G and be exactly 56 characters
 
+
+
 Response guidelines:
 1. Ask follow-up questions if information is missing or unclear
 2. Validate all inputs and politely correct invalid ones
@@ -273,6 +275,7 @@ export async function POST(request: NextRequest) {
         symbol: "🔤 What symbol would you like for your collection? (3-12 characters, uppercase letters/numbers)",
         totalSupply: "🔢 How many NFTs should be minted? (1-10,000)",
         mediaUrlOrPrompt: "🎨 For your NFT artwork, you can upload an image (which I'll style with anime-inspired cinematic effects), provide a URL, or have me generate one from a prompt!",
+
         royaltiesPct: "💰 Do you want to set royalties? (0-10%, optional)",
         airdrop: "🚀 Do you want an immediate airdrop to a wallet address? (optional)"
       };
@@ -625,6 +628,7 @@ function handleFallbackFlow(messages: any[], currentPlan: any, network: string) 
       return NextResponse.json({
         type: 'followup',
         message: `⚠️ That doesn't look like a valid URL or image description.\n\n🎨 **For the NFT artwork, you can:**\n\n1. **Upload an image** (I'll style it with anime-inspired cinematic effects!)\n2. **Provide a URL:**\n   - **https://example.com/image.png**\n   - **ipfs://...**\n\n3. **Describe the image:**\n   - **A majestic dragon with golden scales flying over mountains**\n   - **Pixel art robot in a futuristic city**\n\n**Upload an image above or describe what you'd like!**`,
+
         plan: fallbackPlan,
       });
     }
@@ -654,6 +658,7 @@ function getNextStepMessage(plan: any, prefix = "") {
     message += `🔢 **How many NFTs should be minted for ${plan.collectionName}?**\n\nEnter a number between **1 and 10,000**.`;
   } else if (!plan.mediaUrl && !plan.mediaPrompt) {
     message += `🎨 **Almost done! For the NFT artwork, you can:**\n\n1. **Upload an image** (I'll transform it with anime-inspired cinematic styling)\n2. **Provide an image URL/IPFS link**\n3. **Describe the image you'd like me to generate**\n\n**Just upload an image above or tell me what you'd like!**`;
+
   } else {
     message += `✅ **Perfect! I have everything needed:**\n\n- **Collection:** ${plan.collectionName}\n- **Symbol:** ${plan.symbol}\n- **Supply:** ${plan.totalSupply} NFTs\n- **Media:** ${plan.mediaUrl ? 'URL provided' : 'AI generation planned'}`;
   }

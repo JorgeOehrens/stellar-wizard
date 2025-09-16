@@ -308,5 +308,41 @@
     "description": "Test NFT collection created with one click",
     "royalties": 2.5,
     "imageUrl": "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=500"
+  },
+  {
+    "id": "nft_1758029612348_byxl63pxo",
+    "type": "nft",
+    "userAddress": "GAS522CRS76JWJPI5GJSUMKQ4DD6MWWA6SGVBPZTWMH3WQ7T523LTQWI",
+    "network": "TESTNET",
+    "plan": {
+      "network": "TESTNET",
+      "isComplete": false,
+      "needsInfo": [
+        "mediaUrl"
+      ],
+      "collectionName": "Hackathon",
+      "symbol": "HAKC3",
+      "totalSupply": 1000,
+      "royaltiesPct": 1,
+      "mediaUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/variants/variant-pixel-art-1758029447222-y1kpd6.png",
+      "originalUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/original-622f41fd234a9f23-1758029441617.jpg",
+      "originalSha256": "622f41fd234a9f23bcd02bd93b5d2d870b1688c04e88760989048d9a2f649c27",
+      "editParams": {
+        "preset": "pixel-art",
+        "intensity": 0.7,
+        "options": {
+          "variantCount": 1
+        }
+      },
+      "iterations": 1
+    },
+    "txHash": "a81fe901826319ee0b92ee73b42cde5acce2d1e7b5689fa431037220707c901c",
+    "createdAt": "2025-09-16T13:33:32.348Z",
+    "name": "Hackathon",
+    "symbol": "HAKC3",
+    "supply": 1000,
+    "royalties": 1,
+    "imageUrl": "https://srrebhfzvyxhfaqiqsdr.supabase.co/storage/v1/object/public/images/images/variants/variant-pixel-art-1758029447222-y1kpd6.png"
+
   }
 ]
